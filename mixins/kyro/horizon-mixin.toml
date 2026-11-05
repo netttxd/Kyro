@@ -1,0 +1,923 @@
+[mod]
+id = "kyro"
+version = "1.0.0"
+priority = 100
+
+# Raw targets are exact functions of one Horizon commit. Pin it (generate --horizon-revision SHA):
+[compatibility]
+horizon_revision = "c9d474dd9116e84c243f8992d75c11314df56f06"
+
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "port_kyro"
+source = "runtime.rs"
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+[[injection]]
+id = "hud"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_hud"
+helper = "hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "corners", ty = "&mut horizon_client::extras_hud::Corners", value = "&mut *corners" },
+]
+
+[[injection]]
+id = "entity-glow-mixin-glow-color"
+kind = "HEAD"
+target = "horizon_client::game::glowing::team_color"
+cancellable = true
+helper = "entity-glow-mixin-glow-color.rs"
+bindings = [
+  { name = "team", ty = "&Option<&sb::Team>", value = "&team" },
+]
+
+[[injection]]
+id = "game-renderer-mixin-hurt-cam"
+kind = "MODIFY_ARG"
+target = "horizon_client_render::camera::bob_hurt"
+selector = "rotate_degrees"
+require = 4
+argument = 2
+ordinal = 2
+helper = "game-renderer-mixin-hurt-cam.rs"
+bindings = [
+  { name = "value", ty = "f32", value = "$value" },
+]
+
+[[injection]]
+id = "item-stack-foil-mixin-shine"
+kind = "HEAD"
+target = "horizon_items::item_data::ItemStack::has_foil"
+cancellable = true
+helper = "item-stack-foil-mixin-shine.rs"
+bindings = [
+  { name = "this", ty = "&ItemStack", value = "&*self" },
+  { name = "item_glint", ty = "bool", value = "item_glint" },
+]
+
+[[injection]]
+id = "particle-engine-mixin-skip"
+kind = "HEAD"
+target = "horizon_client_render::particles::ParticleEngine::create"
+cancellable = true
+helper = "particle-engine-mixin-skip.rs"
+bindings = [
+  { name = "this", ty = "&mut ParticleEngine", value = "&mut *self" },
+  { name = "options", ty = "&ParticleOptions", value = "options" },
+  { name = "p", ty = "&[f64; 3]", value = "&p" },
+  { name = "v", ty = "&[f64; 3]", value = "&v" },
+]
+
+[[module]]
+id = "ring"
+file = "crates/horizon-client-render/src/options_ui.rs"
+name = "kyro_ring"
+source = "ring.rs"
+visibility = "pub"
+
+[[injection]]
+id = "ring-draw"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::options_ui::OptionsUi::draw"
+helper = "ring_draw.rs"
+bindings = [
+  { name = "options", ty = "&mut crate::options_ui::OptionsUi", value = "&mut *self" },
+  { name = "batch", ty = "&mut crate::hud::HudBatch", value = "&mut *batch" },
+  { name = "atlas", ty = "&crate::hud::HudAtlas", value = "atlas" },
+  { name = "cursor", ty = "(f32, f32)", value = "cursor" },
+]
+
+[[injection]]
+id = "ring-click"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::options_ui::OptionsUi::click"
+helper = "ring_click.rs"
+bindings = [
+  { name = "options", ty = "&mut crate::options_ui::OptionsUi", value = "&mut *self" },
+  { name = "x", ty = "f32", value = "x" },
+  { name = "y", ty = "f32", value = "y" },
+  { name = "size", ty = "(f32, f32)", value = "size" },
+  { name = "drag", ty = "bool", value = "drag" },
+  { name = "right", ty = "bool", value = "right" },
+]
+
+[[injection]]
+id = "ring-keys"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::options_ui::OptionsUi::key_modifiers"
+helper = "ring_keys.rs"
+bindings = [
+  { name = "options", ty = "&mut crate::options_ui::OptionsUi", value = "&mut *self" },
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+  { name = "typed", ty = "Option<&str>", value = "text" },
+]
+
+[[injection]]
+id = "ring-open"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+helper = "ring_open.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "&str", value = "key" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+]
+
+[[injection]]
+id = "ring-frame"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_frame"
+helper = "ring_frame.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[module]]
+id = "feat"
+file = "crates/horizon-client/src/game.rs"
+name = "kyro_feat"
+source = "feat.rs"
+
+[[injection]]
+id = "feat-key"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+helper = "feat_key.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "&str", value = "key" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+]
+
+[[injection]]
+id = "feat-wheel"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_wheel"
+helper = "feat_wheel.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "steps", ty = "f32", value = "steps" },
+  { name = "claimed", ty = "&mut bool", value = "&mut *claimed" },
+]
+
+[[injection]]
+id = "feat-zoom"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_zoom"
+helper = "feat_zoom.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "zoom", ty = "&mut Option<crate::game::native_hooks::NativeZoom>", value = "&mut *zoom" },
+]
+
+[[injection]]
+id = "feat-mouse"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::Game<'_>::apply_mouse_look"
+helper = "feat_mouse.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "feat-camera"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::perspective::Game<'_>::camera_view"
+helper = "feat_camera.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "partial", ty = "f32", value = "partial" },
+]
+
+[[injection]]
+id = "feat-light"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::sculk::Game<'_>::night_vision_intensity"
+helper = "feat_light.rs"
+bindings = []
+
+[[injection]]
+id = "feat-sprint"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_frame"
+helper = "feat_sprint.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "feat-crosshair"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::hud_layout::crosshair"
+helper = "feat_crosshair.rs"
+bindings = []
+
+[[injection]]
+id = "ring-esc"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::options::Game<'_>::options_key"
+helper = "ring_esc.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+]
+
+[[injection]]
+id = "feat-hit"
+kind = "HEAD"
+target = "horizon_client::game::Game<'_>::attack_mob"
+helper = "feat_hit_local.rs"
+
+[[injection]]
+id = "feat-hit-remote"
+kind = "RETURN"
+target = "horizon_client::game::remote::Game<'_>::remote_start_attack"
+helper = "feat_hit.rs"
+bindings = [
+  { name = "value", ty = "bool", value = "$value" },
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+]
+
+[[injection]]
+id = "feat-fog"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_render_fog"
+helper = "feat_fog.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "fog_type", ty = "horizon_client::fog::FogType", value = "fog_type" },
+  { name = "fog", ty = "&mut horizon_client::fog::FogData", value = "&mut *fog" },
+]
+
+[[injection]]
+id = "feat-fov"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::fov::Game<'_>::fov_player"
+helper = "feat_fov.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+]
+
+[[injection]]
+id = "feat-cape"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::perspective::Game<'_>::player_cape_geometry"
+helper = "feat_cape.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "m", ty = "&Mob", value = "m" },
+  { name = "chest", ty = "Option<&str>", value = "chest" },
+  { name = "camera", ty = "glam::DVec3", value = "camera" },
+  { name = "partial", ty = "f32", value = "partial" },
+  { name = "light", ty = "u32", value = "light" },
+  { name = "out", ty = "&mut Vec<horizon_client::mesher::Vertex>", value = "&mut *out" },
+]
+
+[[injection]]
+id = "feat-wavy"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::mobs::render::cape"
+helper = "feat_wavy.rs"
+bindings = [
+  { name = "m", ty = "&Mob", value = "m" },
+  { name = "alpha", ty = "f32", value = "alpha" },
+  { name = "base", ty = "glam::Mat4", value = "base" },
+  { name = "uv", ty = "[f32; 4]", value = "uv" },
+  { name = "light", ty = "u32", value = "light" },
+  { name = "data", ty = "&MobData", value = "data" },
+  { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
+]
+
+[[injection]]
+id = "feat-scoreboard"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::scoreboard::Game<'_>::draw_scoreboard"
+helper = "feat_scoreboard.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+]
+
+[[injection]]
+id = "feat-time"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::environment::Environment::sample"
+helper = "feat_time.rs"
+bindings = [
+  { name = "environment", ty = "&Environment", value = "self" },
+  { name = "ticks", ty = "i64", value = "ticks" },
+  { name = "sky", ty = "Option<[f32; 3]>", value = "biome_sky" },
+  { name = "fog", ty = "Option<[f32; 3]>", value = "biome_fog" },
+]
+
+[[injection]]
+id = "feat-weather"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::world::Weather::levels"
+helper = "feat_weather.rs"
+bindings = [
+  { name = "partial", ty = "f32", value = "partial" },
+]
+
+[[injection]]
+id = "feat-pumpkin"
+kind = "RETURN"
+target = "horizon_client_render::hud_overlays::camera_overlays"
+helper = "feat_pumpkin.rs"
+bindings = [
+  { name = "value", ty = "Vec<GuiDraw>", value = "$value" },
+]
+
+[[injection]]
+id = "feat-toasts"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::advancements::Game<'_>::draw_toasts"
+helper = "feat_toasts.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "feat-outline"
+kind = "RETURN"
+target = "horizon_client_render::gfx::outline_width"
+helper = "feat_outline.rs"
+bindings = [
+  { name = "value", ty = "f32", value = "$value" },
+]
+
+[[injection]]
+id = "feat-tnt"
+kind = "RETURN"
+target = "horizon_client::game::names::Game<'_>::name_tags"
+helper = "feat_tnt.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "value", ty = "Vec<NameTag>", value = "$value" },
+]
+
+[[injection]]
+id = "feat-hitbox"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::debug_keys::Game<'_>::debug_entry"
+helper = "feat_hitbox.rs"
+bindings = [
+  { name = "path", ty = "&str", value = "path" },
+]
+
+[[injection]]
+id = "feat-chat"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::chat::Chat::push_message"
+helper = "feat_chat.rs"
+bindings = [
+  { name = "chat", ty = "&mut Chat", value = "&mut *self" },
+  { name = "font", ty = "&crate::font::Font", value = "font" },
+  { name = "message", ty = "&Message", value = "&message" },
+  { name = "focused", ty = "bool", value = "focused" },
+]
+
+[[injection]]
+id = "feat-shulker"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component"
+helper = "feat_shulker.rs"
+bindings = [
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "size", ty = "&mut Option<[f32; 2]>", value = "&mut *size" },
+]
+
+[[injection]]
+id = "feat-shulker-draw"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component_draw"
+helper = "feat_shulker_draw.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+  { name = "origin", ty = "[f32; 2]", value = "origin" },
+]
+
+[[injection]]
+id = "feat-shulker-lines"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip"
+helper = "feat_shulker_lines.rs"
+bindings = [
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "lines", ty = "&mut Vec<(Text, u32)>", value = "&mut *lines" },
+]
+
+[[injection]]
+id = "feat-glow"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::glowing::Game<'_>::entity_glowing"
+helper = "feat_glow.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "id", ty = "u32", value = "id" },
+]
+
+[[injection]]
+id = "feat-post"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_shader_params"
+helper = "feat_post.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "params", ty = "&mut [[f32; 4]; 8]", value = "&mut *params" },
+]
+
+[[injection]]
+id = "feat-hurt"
+kind = "RETURN"
+target = "horizon_client_render::overlay::wgsl_constants"
+helper = "feat_hurt.rs"
+bindings = [
+  { name = "value", ty = "String", value = "$value" },
+]
+
+[[injection]]
+id = "feat-glint"
+kind = "RETURN"
+target = "horizon_client_render::hud::HudAtlas::glint_texture"
+helper = "feat_glint.rs"
+bindings = [
+  { name = "value", ty = "(Vec<u8>, u32, u32)", value = "$value" },
+  { name = "name", ty = "&str", value = "name" },
+]
+
+[[injection]]
+id = "feat-hitbox-draw"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::gizmos::Gizmos::entity_box"
+helper = "feat_hitbox_draw.rs"
+bindings = [
+  { name = "gizmos", ty = "&mut Gizmos", value = "&mut *self" },
+  { name = "min", ty = "[f64; 3]", value = "min" },
+  { name = "max", ty = "[f64; 3]", value = "max" },
+  { name = "position", ty = "[f64; 3]", value = "position" },
+  { name = "eye_height", ty = "f32", value = "eye_height" },
+  { name = "living", ty = "bool", value = "living" },
+  { name = "view", ty = "(f32, f32)", value = "view" },
+]
+
+[[injection]]
+id = "feat-skin"
+kind = "HEAD"
+target = "horizon_client::mobs::render::render_visible"
+helper = "feat_skin.rs"
+bindings = [
+  { name = "m", ty = "&Mob", value = "m" },
+  { name = "alpha", ty = "f32", value = "alpha" },
+  { name = "base", ty = "glam::Mat4", value = "base" },
+  { name = "atlas", ty = "Atlas", value = "atlas" },
+  { name = "light", ty = "u32", value = "light" },
+  { name = "data", ty = "&MobData", value = "data" },
+  { name = "body_visible", ty = "bool", value = "body_visible" },
+  { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
+]
+
+[[injection]]
+id = "feat-skin-flat"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::mobs::anim::player_model_visibility"
+helper = "feat_skin_flat.rs"
+bindings = [
+  { name = "p", ty = "&mut Poses", value = "&mut *p" },
+  { name = "spectator", ty = "bool", value = "spectator" },
+]
+
+[[injection]]
+id = "ring-wheel"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::options::Game<'_>::options_scroll"
+helper = "ring_wheel.rs"
+bindings = [
+  { name = "amount", ty = "f32", value = "amount" },
+]
+
+[[injection]]
+id = "feat-server"
+kind = "HEAD"
+target = "horizon_client::game::remote::Game<'_>::connect_server_with_options"
+helper = "feat_server.rs"
+bindings = [
+  { name = "address", ty = "&str", value = "address" },
+]
+
+[[injection]]
+id = "feat-packet"
+kind = "HEAD"
+target = "horizon_client::game::remote::Game<'_>::handle_packet"
+helper = "feat_packet.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "packet", ty = "&C", value = "&packet" },
+]
+
+[[injection]]
+id = "feat-fov-ease"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::camera::Camera::tick"
+helper = "feat_fov_ease.rs"
+bindings = [
+  { name = "camera", ty = "&mut Camera", value = "&mut *self" },
+  { name = "eye", ty = "Option<f32>", value = "entity_eye_height" },
+  { name = "target", ty = "f32", value = "target_fov_modifier" },
+]
+
+[[injection]]
+id = "feat-fire"
+kind = "RETURN"
+target = "horizon_client_render::screen_effects::ScreenEffects::build"
+helper = "feat_fire.rs"
+bindings = [
+  { name = "value", ty = "Vec<ScreenQuad>", value = "$value" },
+]
+
+[[injection]]
+id = "feat-editor-hud"
+kind = "HEAD"
+target = "horizon_client::game::options::Game<'_>::draw_options"
+helper = "feat_editor_hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+]
+
+[[injection]]
+id = "feat-effects"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::potions::Game<'_>::draw_effect_icons"
+helper = "feat_effects.rs"
+bindings = []
+
+[[injection]]
+id = "feat-look-distance"
+kind = "HEAD"
+target = "horizon_client_render::camera::Camera::max_zoom"
+helper = "feat_look_distance.rs"
+bindings = [
+  { name = "distance", ty = "&mut f32", value = "&mut distance" },
+]
+
+[[injection]]
+id = "feat-outline-pick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_block_highlight"
+helper = "feat_outline_pick.rs"
+bindings = [
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[injection]]
+id = "feat-outline-rim"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_visuals"
+helper = "feat_outline_rim.rs"
+bindings = [
+  { name = "rims", ty = "&mut Vec<crate::game::native_hooks::NativeBlockRim>", value = "&mut *rims" },
+]
+
+[[injection]]
+id = "feat-foil"
+kind = "HEAD"
+cancellable = true
+target = "horizon_assets::item_model::Resolve<'_>::has_foil"
+helper = "feat_foil.rs"
+bindings = [
+  { name = "this", ty = "&Resolve<'_>", value = "&*self" },
+]
+
+[[injection]]
+id = "feat-shield-tint"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::item_render::special::submit"
+helper = "feat_shield_tint.rs"
+bindings = [
+  { name = "renderer", ty = "&ItemRenderer", value = "renderer" },
+  { name = "model", ty = "&SpecialModel", value = "model" },
+  { name = "argument", ty = "&Value", value = "argument" },
+  { name = "has_foil", ty = "bool", value = "has_foil" },
+  { name = "pose", ty = "Mat4", value = "pose" },
+  { name = "sprites", ty = "&HashMap<String, Rect>", value = "sprites" },
+  { name = "host", ty = "&dyn SpecialHost", value = "host" },
+  { name = "sink", ty = "&mut dyn ItemSink", value = "&mut *sink" },
+]
+
+[[injection]]
+id = "feat-titles"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::titles::Game<'_>::draw_titles"
+helper = "feat_titles.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+  { name = "bar_height", ty = "i32", value = "bar_height" },
+]
+
+[[injection]]
+id = "feat-chat-filter"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::chat::Chat::layout"
+helper = "feat_chat_filter.rs"
+bindings = [
+  { name = "this", ty = "&Chat", value = "&*self" },
+  { name = "height", ty = "i32", value = "height" },
+  { name = "ticks", ty = "f32", value = "ticks" },
+  { name = "focused", ty = "bool", value = "focused" },
+]
+
+[[injection]]
+id = "feat-chat-click"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::chat::ChatScreen::click"
+helper = "feat_chat_click.rs"
+bindings = [
+  { name = "this", ty = "&ChatScreen", value = "&*self" },
+  { name = "x", ty = "f64", value = "x" },
+  { name = "y", ty = "f64", value = "y" },
+]
+
+[[injection]]
+id = "feat-chat-type"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::chat::ChatScreen::type_text"
+helper = "feat_chat_type.rs"
+bindings = [
+  { name = "text", ty = "&str", value = "text" },
+]
+
+[[injection]]
+id = "feat-chat-key"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::chat::ChatScreen::key"
+helper = "feat_chat_key.rs"
+bindings = [
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+]
+
+[[injection]]
+id = "feat-chat-box"
+kind = "HEAD"
+target = "horizon_client::game::chat::Game<'_>::draw_chat_screen"
+helper = "feat_chat_box.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+]
+
+[[injection]]
+id = "feat-text-shortcut"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::options_ui::OptionsUi::shortcut"
+helper = "feat_text_shortcut.rs"
+bindings = [
+  { name = "shortcut", ty = "crate::clipboard::EditShortcut", value = "shortcut" },
+  { name = "clipboard", ty = "&mut dyn crate::clipboard::Clipboard", value = "&mut *clipboard" },
+]
+
+[[injection]]
+id = "feat-chat-heads"
+kind = "RETURN"
+target = "horizon_client_render::chat::Chat::layout"
+helper = "feat_chat_heads.rs"
+bindings = [
+  { name = "value", ty = "Vec<GuiDraw>", value = "$value" },
+]
+
+[[injection]]
+id = "feat-held-tint"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::mob_blocks::Game<'_>::held_item_geometry"
+helper = "feat_held_tint.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "mob", ty = "&Mob", value = "mob" },
+  { name = "camera", ty = "glam::DVec3", value = "camera" },
+  { name = "alpha", ty = "f64", value = "alpha" },
+  { name = "light", ty = "u32", value = "light" },
+  { name = "lit", ty = "bool", value = "lit" },
+  { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
+]
+
+[[injection]]
+id = "feat-hand-tint"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::Game<'_>::hand_geometry"
+helper = "feat_hand_tint.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "alpha", ty = "f64", value = "alpha" },
+]
+
+[[injection]]
+id = "feat-food"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_health_hud"
+helper = "feat_food.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "inputs", ty = "&horizon_client::hud_layout::HealthInputs", value = "inputs" },
+  { name = "wi", ty = "i32", value = "wi" },
+  { name = "hi", ty = "i32", value = "hi" },
+  { name = "draws", ty = "&mut Option<Vec<horizon_client::hud_layout::GuiDraw>>", value = "&mut *draws" },
+]
+
+[[injection]]
+id = "feat-food-tip"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component"
+helper = "feat_food_tip.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "stack", ty = "&crate::game::ItemStack", value = "stack" },
+  { name = "size", ty = "&mut Option<[f32; 2]>", value = "&mut *size" },
+]
+
+[[injection]]
+id = "feat-food-tip-draw"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component_draw"
+helper = "feat_food_tip_draw.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "stack", ty = "&crate::game::ItemStack", value = "stack" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "origin", ty = "[f32; 2]", value = "origin" },
+]
+
+[[injection]]
+id = "ring-release"
+kind = "HEAD"
+target = "horizon_client_render::options_ui::OptionsUi::release"
+helper = "ring_release.rs"
+
+[[injection]]
+id = "feat-chat-keep"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::chat::Chat::clear"
+helper = "feat_chat_keep.rs"
+
+[[injection]]
+id = "feat-chat-hover"
+kind = "HEAD"
+target = "horizon_client_render::chat::Chat::style_at"
+helper = "feat_chat_hover.rs"
+bindings = [
+  { name = "this", ty = "&Chat", value = "self" },
+  { name = "height", ty = "i32", value = "height" },
+  { name = "x", ty = "f64", value = "x" },
+  { name = "y", ty = "f64", value = "y" },
+]
+
+[[injection]]
+id = "feat-chat-copy"
+kind = "HEAD"
+target = "horizon_client::game::Game<'_>::handle_window_event_inner"
+helper = "feat_chat_copy.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "event", ty = "&winit::event::WindowEvent", value = "&event" },
+]
+
+[[injection]]
+id = "feat-tab-name"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::tab_list::name_for_display"
+helper = "feat_tab_name.rs"
+bindings = [
+  { name = "player", ty = "&TabPlayer", value = "p" },
+  { name = "board", ty = "&Scoreboard", value = "board" },
+]
+
+[[injection]]
+id = "feat-tab-ping"
+kind = "RETURN"
+target = "horizon_client_render::tab_list::TabList::layout"
+helper = "feat_tab_ping.rs"
+bindings = [
+  { name = "value", ty = "Vec<GuiDraw>", value = "$value" },
+  { name = "inputs", ty = "&TabInputs<'_>", value = "i" },
+  { name = "font", ty = "&Font", value = "font" },
+]
+
+[[injection]]
+id = "feat-shield-down"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::shield::Game<'_>::blocked_by_attacker"
+helper = "feat_shield_down.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "component", ty = "&horizon_client::items::BlocksAttacks", value = "component" },
+  { name = "attacker", ty = "[f64; 2]", value = "attacker" },
+  { name = "fully", ty = "bool", value = "fully" },
+  { name = "disable", ty = "f32", value = "disable" },
+  { name = "at", ty = "Option<[f64; 3]>", value = "at" },
+]
+
+[[injection]]
+id = "feat-glint-uv"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::item_render::Glint::uv"
+helper = "feat_glint_uv.rs"
+bindings = [
+  { name = "this", ty = "&Glint", value = "self" },
+  { name = "model", ty = "[f32; 2]", value = "model" },
+]
+
+[[injection]]
+id = "feat-item-physics"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::item_draw::Game<'_>::dropped_item_geometry"
+helper = "feat_item_physics.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "camera", ty = "glam::DVec3", value = "camera" },
+  { name = "alpha", ty = "f64", value = "alpha" },
+  { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
+]
+
+[[injection]]
+id = "feat-held"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::first_person::item_pose"
+helper = "feat_held.rs"
+bindings = [
+  { name = "left", ty = "bool", value = "left" },
+  { name = "inverse_height", ty = "f32", value = "inverse_height" },
+  { name = "attack", ty = "f32", value = "attack" },
+  { name = "item", ty = "ItemPose", value = "pose" },
+]
+
+[[injection]]
+id = "feat-swing"
+kind = "RETURN"
+target = "horizon_client::first_person::swing_duration"
+helper = "feat_swing.rs"
+bindings = [
+  { name = "value", ty = "i32", value = "$value" },
+  { name = "animation", ty = "SwingAnimation", value = "animation" },
+]
+
+[[injection]]
+id = "feat-capes-install"
+kind = "HEAD"
+target = "horizon_mods::manifest::find"
+helper = "feat_capes_install.rs"
+bindings = [
+  { name = "dir", ty = "&std::path::Path", value = "dir" },
+]
