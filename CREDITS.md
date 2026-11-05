@@ -12,6 +12,8 @@ Kyro builds on these projects.
 
 The motion blur shader (`PACK_BLUR` in `mixins/kyro/ring_frame.rs`) is
 based on Natural Motion Blur and stays under the LGPL-3.0, not Kyro's license.
+The license texts are in `mixins/kyro/data/LICENSE-LGPL-3.0.txt` and
+`mixins/kyro/data/LICENSE-GPL-3.0.txt`.
 
 Minecraft is a trademark of Mojang AB. Kyro is not affiliated with Mojang or Microsoft.
 

@@ -23,6 +23,10 @@ Or download `kyro-<version>.hnmod` from [Releases](https://github.com/netttxd/Ky
 
 Kyro is a native mod, so it runs with full access to your computer. Only install it from this repository.
 
+## Privacy
+
+Lyrics is off by default. When you turn it on, Kyro reads the song playing on your computer and sends its title and artist to lrclib.net, api.betterlyrics.org and itunes.apple.com to get lyrics and cover art. On Windows it does this through a hidden PowerShell process, which keeps running until you close the game.
+
 ## License
 
 All rights reserved: free to use, not to copy or re-upload. See [LICENSE](LICENSE) and [CREDITS.md](CREDITS.md).
