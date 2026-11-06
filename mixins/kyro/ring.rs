@@ -186,7 +186,6 @@ fn picker_input(cursor: (f32, f32), size: (f32, f32), dragging: bool) -> bool {
 pub const COLORS: [u32; 8] = [0xffffff, 0xff5555, 0xffaa00, 0xffff55, 0x55ff55, 0x55ffff, 0x5555ff, 0xff55ff];
 const SETTINGS_W: f32 = 270.0;
 
-const BACK: [&str; 16] = ["................", "....kk..........", "...kyk..........", "..kyyk..kkkkk...", ".kyyyykkyyyyyk..", "kyyyyyyyyooyyyk.", ".kyyyyoooookkyyk", "..koyk.kkk..koyk", "...kok......koyk", "....kk......koyk", "............koyk", "..........kkyyk.", "....kkkkkkyyyk..", "....kyyyyyyok...", "....kkkkkkkk....", "................"];
 
 #[derive(Default)]
 struct State {
@@ -355,39 +354,7 @@ pub fn back() -> bool {
     })
 }
 
-fn pixel_color(c: char) -> u32 {
-    match c {
-        'k' => rgba(12, 12, 24, 255),
-        'w' => ink(),
-        'l' => rgba(216, 220, 232, 255),
-        'g' => rgba(152, 160, 184, 255),
-        'd' => rgba(88, 96, 128, 255),
-        'y' => accent(),
-        'o' => rgba(232, 152, 32, 255),
-        'q' => rgba(168, 92, 16, 255),
-        'b' => rgba(72, 120, 232, 255),
-        'c' => rgba(168, 208, 255, 255),
-        'n' => rgba(32, 48, 128, 255),
-        'r' => rgba(240, 80, 80, 255),
-        'p' => rgba(255, 156, 140, 255),
-        'm' => rgba(152, 40, 56, 255),
-        't' => rgba(120, 78, 40, 255),
-        'u' => rgba(112, 68, 32, 255),
-        's' => rgba(214, 160, 120, 255),
-        _ => 0,
-    }
-}
 
-fn sprite(batch: &mut HudBatch, atlas: &HudAtlas, rows: &[&str], x: f32, y: f32, scale: f32) {
-    for (j, row) in rows.iter().enumerate() {
-        for (i, c) in row.chars().enumerate() {
-            let color = pixel_color(c);
-            if color != 0 {
-                batch.fill(atlas, x + i as f32 * scale, y + j as f32 * scale, scale, scale, color);
-            }
-        }
-    }
-}
 
 /// The pixel rounded corner used everywhere: two steps cut from each corner.
 fn notched(batch: &mut HudBatch, atlas: &HudAtlas, x: f32, y: f32, w: f32, h: f32, color: u32) {
@@ -498,8 +465,15 @@ pub fn crosshair_row(row: usize) -> i32 {
 fn draw_canvas(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32)) {
     let [x, y, w, h] = canvas_rect(batch.width, batch.height);
     frame(batch, atlas, x, y, w, h);
-    sprite(batch, atlas, &BACK, x + 5.0, y + 4.0, 1.0);
-    text(batch, atlas, "Draw crosshair", x + 26.0, y + 8.0, ink(), false);
+    batch.fill(atlas, x, y, w, HEADER - 4.0, sel());
+    if cursor.0 >= x && cursor.0 < x + 26.0 && cursor.1 >= y && cursor.1 < y + HEADER - 4.0 {
+        batch.fill(atlas, x, y, 22.0, HEADER - 4.0, ca(6, 50));
+    }
+    let uv = white_uv(batch, atlas);
+    let (tip, mid) = ([x + 8.0, y + 10.0], y + 10.0);
+    stroke(batch, uv, tip, [x + 13.0, mid - 5.0], 1.5, seltxt(), seltxt());
+    stroke(batch, uv, tip, [x + 13.0, mid + 5.0], 1.5, seltxt(), seltxt());
+    text(batch, atlas, "Draw crosshair", x + 26.0, y + 6.0, seltxt(), false);
     let (gx, gy) = (x + 8.0, y + HEADER + 4.0);
     for row in 0..15 {
         let bits = crosshair_row(row);
@@ -509,9 +483,9 @@ fn draw_canvas(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32)) {
             let fill = if bits >> col & 1 == 1 {
                 accent()
             } else if hot {
-                rgba(90, 104, 170, 255)
+                ca(3, 90)
             } else if row == 7 && col == 7 {
-                rgba(40, 52, 110, 255)
+                line()
             } else {
                 sunk()
             };
