@@ -8,6 +8,10 @@ fn kyro_ring_open(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
     if key != game.native_mod_key(p::ID, "menu", "key.keyboard.right.shift") {
         return;
     }
+    let held = i32::from(game.modifiers.shift_key()) | i32::from(game.modifiers.control_key()) << 1 | i32::from(game.modifiers.alt_key()) << 2;
+    if m::listening().is_some() || m::just_bound() || !m::bind_ok("menu", key, held) {
+        return;
+    }
     if game.native_playing() {
         game.capture(false);
         game.open_options_at(true, Page::Mods);

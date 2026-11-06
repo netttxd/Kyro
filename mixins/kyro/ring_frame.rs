@@ -97,6 +97,17 @@ fn post(input: PostInput) -> vec4<f32> {
     }
     game.settings.extras.own_name_tag = m::on("own_nametag");
     m::set_own_name(game.own_profile_name());
+    // Glass uses the game's own menu blur, at its slider, and gives the option back on close.
+    if let Some(blur) = m::glass_blur() {
+        if m::own_blur().is_none() {
+            m::set_own_blur(Some(game.settings.menu_blur));
+        }
+        game.settings.menu_blur = blur;
+    } else if let Some(own) = m::own_blur() {
+        game.settings.menu_blur = own;
+        m::set_own_blur(None);
+    }
+    m::set_held(i32::from(game.modifiers.shift_key()) | i32::from(game.modifiers.control_key()) << 1 | i32::from(game.modifiers.alt_key()) << 2);
     if game.screen == crate::game::Screen::Options {
         m::set_menu_key(&game.native_mod_key(p::ID, "menu", "key.keyboard.right.shift"));
         m::set_key_name("menu", &game.native_mod_key(crate::game::port_kyro::ID, "menu", "key.keyboard.right.shift"));
@@ -181,14 +192,15 @@ fn post(input: PostInput) -> vec4<f32> {
     }
     if let Some((name, key)) = m::take_picked() {
         game.settings.mods.keys.entry(p::ID.to_owned()).or_default().insert(name.to_owned(), key.to_owned());
+        // The save must hold your own menu blur, not Glass's stand-in.
+        let shown = game.settings.menu_blur;
+        game.settings.menu_blur = m::own_blur().unwrap_or(shown);
         game.settings.save(&crate::game::Game::options_path());
+        game.settings.menu_blur = shown;
     }
     if m::take_close() {
         m::reset_list();
         let _ = game.options_key(winit::keyboard::KeyCode::Escape, None);
-    }
-    if let Some(skin) = game.player_model.as_ref().and_then(|p| p.skin.as_deref()) {
-        m::set_own_skin(skin);
     }
     if let Some(eye) = game.eye_position() {
         m::set_eye(eye);

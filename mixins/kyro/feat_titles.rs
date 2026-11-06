@@ -5,6 +5,9 @@ fn kyro_feat_titles(game: &crate::game::Game<'_>, batch: &mut HudBatch, bar_heig
     let partial = game.clock.fraction() as f32;
     let background = game.settings.text_background(0.0);
     let atlas = &game.gui.atlas;
+    // Held back so a background can sit under what the game draws.
+    let slot = batch.vertices.len();
+    batch.fill(atlas, 0.0, 0.0, 0.0, 0.0, 0);
     let start = batch.vertices.len();
     if ring::on("action_bar") {
         let draws = game.titles.overlay_message(w, h, bar_height, partial, &atlas.font, background);
@@ -18,12 +21,15 @@ fn kyro_feat_titles(game: &crate::game::Game<'_>, batch: &mut HudBatch, bar_heig
             x1 = x1.max(v.pos[0]);
             y1 = y1.max(v.pos[1]);
         }
-        let (x, y, scale, _) = ring::place("action_bar", x1 - x0, y1 - y0, (x0, y0));
+        let (x, y, scale, panel) = ring::place("action_bar", x1 - x0, y1 - y0, (x0, y0));
         for v in &mut batch.vertices[start..] {
             v.pos[0] += x - x0;
             v.pos[1] += y - y0;
         }
-        batch.scale_since(start, x, y, scale, scale);
+        if panel {
+            ring::back_panel(&mut batch.vertices[slot..], [x - 3.0, y - 2.0, x1 - x0 + 6.0, y1 - y0 + 4.0]);
+        }
+        batch.scale_since(slot, x, y, scale, scale);
     } else {
         // Nothing to show: the editor still gets a box to drag.
         ring::place("action_bar", 182.0, 12.0, (((batch.width - 182.0) / 2.0).floor(), batch.height - 72.0));

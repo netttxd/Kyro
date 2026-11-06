@@ -440,7 +440,7 @@ pub fn draw_feed(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::
     let (x, y, zoom, panel) = ring::place("kill_feed", width, height, ((batch.width * 0.25).floor(), (batch.height * 0.1).floor()));
     let first = batch.vertices.len();
     if panel {
-        game.native_fill(batch, [x, y, width, height], 0x60000000);
+        game.native_fill(batch, [x, y, width, height], ring::hud_panel());
     }
     for (index, entry) in k.entries.iter().enumerate() {
         let row = y + 4.0 + index as f32 * ROW;
@@ -451,11 +451,11 @@ pub fn draw_feed(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::
             game.draw_item_model(batch, weapon, x + 6.0, row - 1.0);
             batch.scale_since(start, x + 6.0, row - 1.0, 0.75, 0.75);
         }
-        let ink = if entry.death { 0xff8d8d } else if entry.player { 0xedf3f4 } else { 0xb9c3ca };
+        let ink = if entry.death { 0xff8d8d } else { ring::panel_text(panel, 0, if entry.player { 0xedf3f4 } else { 0xb9c3ca }) };
         lyric_text(game, batch, &entry.name, (x + 22.0, row + 3.0), 1.0, ink, alpha, true);
         if entry.streak > 1 {
             let shown = format!("x{}", entry.streak);
-            lyric_text(game, batch, &shown, (x + width - 6.0 - game.native_text_width(&shown), row + 3.0), 1.0, 0xffd166, alpha, true);
+            lyric_text(game, batch, &shown, (x + width - 6.0 - game.native_text_width(&shown), row + 3.0), 1.0, ring::panel_value(panel, -1, 0xffd166), alpha, true);
         }
     }
     batch.scale_since(first, x, y, zoom, zoom);
@@ -557,6 +557,8 @@ struct Media {
     duration: i64,
     /// The cover as runs of near-equal pixels: x, y, length, RGB; and its average color.
     cover: Vec<(u8, u8, u8, u32)>,
+    /// Goes up with each new cover, so its finished vertices are only built once.
+    cover_id: u32,
     accent: u32,
     /// The lyric lookup for this song has finished.
     done: bool,
@@ -810,6 +812,7 @@ fn media_line(parts: &[&str]) {
                 }
             }
             m.cover = runs;
+            m.cover_id += 1;
         }
         ["D"] => {
             let mut rates: Vec<f32> = m.lyrics.windows(2).filter(|l| !l[0].1.is_empty()).map(|l| (l[1].0 - l[0].0) as f32 / letters(&l[0].1) as f32).collect();
@@ -1065,8 +1068,6 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
     const H: f32 = 74.0;
     const PAD: f32 = 6.0;
     const COVER: f32 = 30.0;
-    const MUTED: u32 = 0xa8b0b8;
-    const INK: u32 = 0xffffff;
     MEDIA_STARTED.call_once(|| {
         // Position and lyrics read apart, so a slow lookup never stalls the clock.
         if !cfg!(windows) {
@@ -1096,13 +1097,14 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
     // With nothing playing the box is just its one line.
     let (w, h) = if m.title.is_empty() { (game.native_text_width("Nothing playing") + 2.0 * PAD + 4.0, 8.0 + 2.0 * PAD) } else { (W, H) };
     let (x, y, zoom, panel) = ring::place("lyrics", w, h, (((batch.width - W) / 2.0).floor(), ((batch.height - H) * 0.76).floor()));
+    let (ink, muted) = (ring::panel_text(panel, 0, 0xffffff), ring::panel_text(panel, 0, 0xa8b0b8));
     let first = batch.vertices.len();
     if panel {
-        game.native_fill(batch, [x, y, w, h], 0x90101018);
+        game.native_fill(batch, [x, y, w, h], ring::hud_panel());
     }
     let accent = if m.accent != 0 { m.accent } else { 0x1db954 };
     if m.title.is_empty() {
-        game.native_text(batch, "Nothing playing", [x + PAD + 2.0, y + PAD], MUTED, true);
+        game.native_text(batch, "Nothing playing", [x + PAD + 2.0, y + PAD], muted, true);
         batch.scale_since(first, x, y, zoom, zoom);
         return;
     }
@@ -1131,23 +1133,46 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
     // Cover place, title, artist.
     let (cx, cy) = (x + PAD, y + PAD);
     if !m.cover.is_empty() {
-        for (px, py, length, pixel) in &m.cover {
-            game.native_fill(batch, [cx + f32::from(*px) * 0.5, cy + f32::from(*py) * 0.5, f32::from(*length) * 0.5, 0.5], 0xff000000 | pixel);
+        // A cover is thousands of small rectangles: build them once per cover, then only copy them.
+        thread_local! {
+            static COVER: std::cell::RefCell<(u32, Vec<horizon_client::hud::HudVertex>)> = const { std::cell::RefCell::new((0, Vec::new())) };
         }
+        COVER.with_borrow_mut(|(id, quads)| {
+            if *id != m.cover_id {
+                let start = batch.vertices.len();
+                for (px, py, length, pixel) in &m.cover {
+                    game.native_fill(batch, [f32::from(*px) * 0.5, f32::from(*py) * 0.5, f32::from(*length) * 0.5, 0.5], 0xff000000 | pixel);
+                }
+                *quads = batch.vertices.split_off(start);
+                *id = m.cover_id;
+            }
+            batch.vertices.extend(quads.iter().map(|v| horizon_client::hud::HudVertex { pos: [v.pos[0] + cx, v.pos[1] + cy], ..*v }));
+        });
     } else {
         game.native_fill(batch, [cx, cy, COVER, COVER], 0x461db954);
-        game.native_text(batch, "♪", [cx + COVER / 2.0 - 3.0, cy + COVER / 2.0 - 4.0], INK, true);
+        game.native_text(batch, "♪", [cx + COVER / 2.0 - 3.0, cy + COVER / 2.0 - 4.0], ink, true);
     }
     let text_x = cx + COVER + 7.0;
-    game.native_text(batch, &trim(&m.title, x + W - PAD - 13.0 - text_x), [text_x, cy + 4.0], INK, true);
-    game.native_text(batch, &trim(&m.artist, x + W - PAD - text_x), [text_x, cy + 16.0], MUTED, true);
+    // Measuring a long title letter by letter adds up, so it happens once per song.
+    thread_local! {
+        static CUT: std::cell::RefCell<(String, String, String)> = const { std::cell::RefCell::new((String::new(), String::new(), String::new())) };
+    }
+    CUT.with_borrow_mut(|(key, title, artist)| {
+        if *key != song {
+            key.clone_from(&song);
+            *title = trim(&m.title, x + W - PAD - 13.0 - text_x);
+            *artist = trim(&m.artist, x + W - PAD - text_x);
+        }
+        game.native_text(batch, title, [text_x, cy + 4.0], ink, true);
+        game.native_text(batch, artist, [text_x, cy + 16.0], muted, true);
+    });
     // Equalizer: three bars that dance while playing and rest flat when paused.
     let seconds = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0.0, |t| (t.as_millis() % 1_000_000) as f32 / 1000.0);
     for bar in 0..3 {
         let b = bar as f32;
         let level = if m.playing { 0.35 + 0.65 * (seconds * (5.1 + b * 1.7) + b * 1.3).sin().abs() } else { 0.2 };
         let height = (9.0 * level).round().max(2.0);
-        game.native_fill(batch, [x + W - PAD - 9.0 + b * 3.0, cy + 13.0 - height, 2.0, height], 0xff000000 | if m.playing { accent } else { MUTED });
+        game.native_fill(batch, [x + W - PAD - 9.0 + b * 3.0, cy + 13.0 - height, 2.0, height], 0xff000000 | if m.playing { accent } else { muted });
     }
     let state = guard.get_or_insert_with(|| Shown {
         index: -2,
@@ -1238,7 +1263,7 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
     if eased < 1.0 && !state.before.is_empty() && 1.0 - eased > 0.03 {
         // The old line flies up, shrinks a little, and fades.
         let scale = state.before_scale * (1.0 - 0.12 * eased);
-        lyric_text(game, batch, &state.before, (x + PAD, lyric_y - 4.0 * eased + 4.0 * (1.0 - scale)), scale, MUTED, 1.0 - eased, true);
+        lyric_text(game, batch, &state.before, (x + PAD, lyric_y - 4.0 * eased + 4.0 * (1.0 - scale)), scale, muted, 1.0 - eased, true);
     }
     // Words drop in one after another; each pops, lifts, flashes and glows the moment it is sung.
     let word_now = position + 150 + shift;
@@ -1271,13 +1296,13 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
         let lift = -3.0 * bump + 7.0 * (1.0 - enter);
         let current = timed && sung && i + 1 == reached;
         let ink = if !timed {
-            if index >= 0 { INK } else { MUTED }
+            if index >= 0 { ink } else { muted }
         } else if !sung {
-            MUTED
+            muted
         } else if current {
-            mix(INK, accent, 0.55 + 0.45 * pop)
+            mix(ink, accent, 0.55 + 0.45 * pop)
         } else {
-            mix(accent, INK, pop)
+            mix(accent, ink, pop)
         };
         let alpha = enter * if sung { 1.0 } else { 0.6 };
         let middle = word.x + word.w / 2.0;
@@ -1299,7 +1324,7 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
     }
     // The next line, faded, unless the current one needs two rows.
     if state.rows == 1 && !state.next.trim().is_empty() {
-        lyric_text(game, batch, &state.next, (x + PAD, lyric_y + 15.0), 1.0, INK, 0.43, true);
+        lyric_text(game, batch, &state.next, (x + PAD, lyric_y + 15.0), 1.0, ink, 0.43, true);
     }
     batch.scale_since(first, x, y, zoom, zoom);
 }

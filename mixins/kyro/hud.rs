@@ -220,10 +220,10 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             let cx = cx.min(batch.width - width * scale).max(0.0);
             let start = batch.vertices.len();
             if panel {
-                game.native_fill(batch, [cx - 2.0, cy, width + 4.0, 20.0], 0x60000000);
+                game.native_fill(batch, [cx - 2.0, cy, width + 4.0, 20.0], ring::hud_panel());
             }
             let chosen = ring::value("totems", "text_color");
-            let ink = if chosen < 0 { MINT } else { ring::color_of(chosen) };
+            let ink = ring::panel_value(panel, chosen, if chosen < 0 { MINT } else { ring::color_of(chosen) });
             for (index, (stack, label, count)) in cells.iter().enumerate() {
                 let x = cx + index as f32 * CELL;
                 match stack {
@@ -329,7 +329,7 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             let (x, y, scale, panel) = ring::place("inventory", w, h, (((batch.width - w) / 2.0).floor(), (batch.height * 0.7 - 30.0).floor()));
             let start = batch.vertices.len();
             if panel {
-                game.native_fill(batch, [x, y, w, h], 0x60000000);
+                game.native_fill(batch, [x, y, w, h], ring::hud_panel());
                 // The lines between the slots.
                 for column in 0..=9 {
                     game.native_fill(batch, [x + 2.0 + column as f32 * 18.0, y + 2.0, 1.0, 55.0], 0x40ffffff);
@@ -418,10 +418,10 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
                 let (x, y, scale, panel) = ring::place("ping", SIZE.0, SIZE.1, (4.0, (batch.height * 0.16).floor()));
                 let start = batch.vertices.len();
                 if panel {
-                    game.native_fill(batch, [x, y, SIZE.0, SIZE.1], 0x60000000);
+                    game.native_fill(batch, [x, y, SIZE.0, SIZE.1], ring::hud_panel());
                 }
                 let tone = |v: i32| if v <= 80 { 0x55ff55_u32 } else if v <= 150 { 0xffaa00 } else { 0xff5555 };
-                game.native_text(batch, "Ping", [x + 6.0, y + 5.0], ring::color_of(ring::value("ping", "label_color")), true);
+                game.native_text(batch, "Ping", [x + 6.0, y + 5.0], ring::panel_text(panel, ring::value("ping", "label_color"), ring::color_of(ring::value("ping", "label_color"))), true);
                 game.native_text(batch, &format!("{ms} ms"), [x + 10.0 + game.native_text_width("Ping"), y + 5.0], tone(ms as i32), true);
                 let (left, right, bottom, top) = (x + 6.0, x + SIZE.0 - 6.0, y + SIZE.1 - 5.0, y + 18.0);
                 game.native_fill(batch, [left, bottom, right - left, 1.0], 0x40ffffff);
@@ -470,9 +470,9 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             let (ax, ay, scale, panel) = ring::place("armor", size.0, size.1, (batch.width - size.0, (batch.height * 0.85 - size.1).floor()));
             let start = batch.vertices.len();
             if panel {
-                game.native_fill(batch, [ax, ay, size.0, size.1], 0x60000000);
+                game.native_fill(batch, [ax, ay, size.0, size.1], ring::hud_panel());
             }
-            let ink = ring::color_of(ring::value("armor", "text_color"));
+            let ink = ring::panel_text(panel, ring::value("armor", "text_color"), ring::color_of(ring::value("armor", "text_color")));
             for (index, slot) in game.armor.iter().enumerate() {
                 let i = index as f32;
                 let x = ax + if wide { 3.0 + i * CELL + (CELL - 16.0) / 2.0 } else { 2.0 + (cell - 16.0) / 2.0 };
@@ -531,12 +531,12 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             let ex = ex.min(batch.width - width * scale).max(0.0); // Grows left at the right edge.
             let start = batch.vertices.len();
             if panel {
-                game.native_fill(batch, [ex, ey, width, 36.0], 0x60000000);
+                game.native_fill(batch, [ex, ey, width, 36.0], ring::hud_panel());
             }
             // The off half of a hard blink, twice a second.
             let blink = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).is_ok_and(|t| t.as_millis() / 250 % 2 == 1);
             let chosen = ring::value("potions", "text_color");
-            let ink = if chosen < 0 { WHITE } else { ring::color_of(chosen) };
+            let ink = ring::panel_text(panel, chosen, if chosen < 0 { WHITE } else { ring::color_of(chosen) });
             if list.is_empty() && ring::editing() {
                 // The editor's empty slot.
                 let (sx, sy) = (ex + 3.0 + (CELL - 18.0) / 2.0, ey + 4.0);
@@ -560,7 +560,7 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
                         n => n.to_string(),
                     };
                     let at = x + CELL - 2.0 - game.native_text_width(&shown) * 0.75;
-                    crate::game::kyro_feat::lyric_text(game, batch, &shown, (at, ey + 2.0), 0.75, ring::color_of(ring::value("potions", "label_color")), 1.0, true);
+                    crate::game::kyro_feat::lyric_text(game, batch, &shown, (at, ey + 2.0), 0.75, ring::panel_text(panel, ring::value("potions", "label_color"), ring::color_of(ring::value("potions", "label_color"))), 1.0, true);
                 }
                 let seconds = effect.duration.max(0) / 20;
                 let time = if effect.duration < 0 { "**:**".to_owned() } else { format!("{}:{:02}", seconds / 60, seconds % 60) };
@@ -613,11 +613,11 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             }
             let start = batch.vertices.len();
             if panel {
-                game.native_fill(batch, [x - 2.0, y - 2.0, width + 4.0, height + 2.0], 0x60000000);
+                game.native_fill(batch, [x - 2.0, y - 2.0, width + 4.0, height + 2.0], ring::hud_panel());
             }
-            let label_ink = ring::color_of(ring::value(id, "label_color"));
+            let label_ink = ring::panel_text(panel, ring::value(id, "label_color"), ring::color_of(ring::value(id, "label_color")));
             let chosen = ring::value(id, "text_color");
-            let value_ink = if chosen < 0 { MINT } else { ring::color_of(chosen) };
+            let value_ink = ring::panel_value(panel, chosen, if chosen < 0 { MINT } else { ring::color_of(chosen) });
             for (index, (_, label, value)) in block.iter().enumerate() {
                 let row = y + index as f32 * 12.0;
                 // Mobs spawn at block light 0.
@@ -661,9 +661,9 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             let (x, y, scale, panel) = ring::place("keystrokes", 70.0, tall, (4.0, batch.height - tall - 4.0));
             let start = batch.vertices.len();
             if panel {
-                game.native_fill(batch, [x - 2.0, y - 2.0, 74.0, tall + 4.0], 0x60000000);
+                game.native_fill(batch, [x - 2.0, y - 2.0, 74.0, tall + 4.0], ring::hud_panel());
             }
-            let ink = ring::color_of(ring::value("keystrokes", "label_color"));
+            let ink = ring::panel_text(panel, ring::value("keystrokes", "label_color"), ring::color_of(ring::value("keystrokes", "label_color")));
             let chosen = ring::value("keystrokes", "held_color");
             let pressed = if chosen < 0 { HELD } else { 0xa0000000 | ring::color_of(chosen) };
             for (index, dx, dy, w, h) in places {

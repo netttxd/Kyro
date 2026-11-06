@@ -1,6 +1,6 @@
 # Kyro
 
-A client for Horizon with HUD, PvP and visual tools, a ring menu and a drag-and-drop HUD editor.
+A client for Horizon with HUD, PvP and visual tools, a swipeable menu, themes and a drag-and-drop HUD editor.
 
 ## Features
 
@@ -8,7 +8,8 @@ A client for Horizon with HUD, PvP and visual tools, a ring menu and a drag-and-
 - **PvP:** Hit markers, Hit color, Damage numbers, Combo, Cooldown indicator, Hitboxes, Low health glow, Gear warning, Shield
 - **Visual:** Crosshair and editor, Held items, FOV control, Hurt cam, Motion blur, Color saturation, Fullbright, Clear fluids, World look, Low obstruction, Hide particles, Block outline, Item highlighter, Shulker preview, Glint color, Shiny potions, Food saturation, Item physics, TNT timer, 3D skin layers, Own nametag
 - **Client:** Zoom, Freelook, Sprint, Better chat, Ping numbers
-- **Capes:** Wavy capes and 17 capes
+- **Capes:** Wavy capes and 25 capes, 20 of them animated
+- **Themes:** 11 themes, 5 animated, Glass with adjustable blur, and custom colors
 
 ## Install
 
