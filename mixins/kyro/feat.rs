@@ -1219,8 +1219,8 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
         -4
     } else {
         // A line whose words light up comes early enough to read; a line that only appears, on time.
-        let guess = ring::value("lyrics", "guess") == 1;
-        m.lyrics.iter().rposition(|l| l.0 <= position + shift + if l.2.is_empty() && !guess { 100 } else { 260 }).map_or(-1, |i| i as i64)
+        let words = ring::value("lyrics", "word_for_word") == 1;
+        m.lyrics.iter().rposition(|l| l.0 <= position + shift + if words { 260 } else { 100 }).map_or(-1, |i| i as i64)
     };
     if index != state.index || song != state.song {
         let room = W - 2.0 * PAD;
@@ -1241,10 +1241,9 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
         } else {
             (2.0 * room * 0.9 / full).clamp(0.72, 1.0)
         };
-        // Lyric sites time whole lines. Without real word times the line lights up at once, as good
-        // lyric apps do: guessed words drift off the singing however well they're spread.
-        let exact = sung.is_some_and(|l| l.2.len() == l.1.split(' ').count());
-        state.timed = sung.is_some_and(|l| !l.1.trim().is_empty()) && (exact || ring::value("lyrics", "guess") == 1);
+        // Word for word uses real word times, or spreads the words over the line when a site has none.
+        // Off, the whole line lights up at once.
+        state.timed = sung.is_some_and(|l| !l.1.trim().is_empty()) && ring::value("lyrics", "word_for_word") == 1;
         let starts = sung.filter(|_| state.timed).map_or(Vec::new(), |l| {
             let after = m.lyrics.get(index as usize + 1).map_or(l.0 + 5000, |n| n.0);
             if l.2.len() == l.1.split(' ').count() { l.2.clone() } else { spread(&l.1, l.0, after, m.pace) }

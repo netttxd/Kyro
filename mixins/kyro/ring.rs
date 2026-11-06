@@ -58,7 +58,7 @@ fn settings_of(id: &str) -> &'static [(&'static str, &'static str, i32, i32, i32
         "freelook" => &[("solo", "Singleplayer only", 0, 1, 0), ("scroll", "Scroll to zoom", 0, 1, 1), ("key_freelook", "Key", 0, 0, 0), ("text_blocked", "Blocked servers", 0, 0, 0)],
         "sprint" => &[("always", "Always sprint", 0, 1, 0)],
         "particles" => &[("amount", "Amount", 0, 100, 100), ("explosions", "Explosions", 0, 1, 1), ("blocks", "Blocks", 0, 1, 1), ("potions", "Potions", 0, 1, 1)],
-        "lyrics" => &[("offset", "Offset (ms)", -500, 500, 0), ("delay", "Lyric delay (ms)", -5000, 5000, 0), ("key_lyric_earlier", "Earlier key", 0, 0, 0), ("key_lyric_later", "Later key", 0, 0, 0), ("online", "Online lyrics", 0, 1, 1), ("guess", "Guess word timing", 0, 1, 0), ("panel", "Background", 0, 1, 0)],
+        "lyrics" => &[("offset", "Offset (ms)", -500, 500, 0), ("delay", "Lyric delay (ms)", -5000, 5000, 0), ("key_lyric_earlier", "Earlier key", 0, 0, 0), ("key_lyric_later", "Later key", 0, 0, 0), ("online", "Online lyrics", 0, 1, 1), ("word_for_word", "Word for word", 0, 1, 1), ("panel", "Background", 0, 1, 0)],
         "totems" => &[("count_totems", "Totems", 0, 1, 1), ("count_pearls", "Pearls", 0, 1, 0), ("count_gapples", "Enchanted apples", 0, 1, 0), ("count_golden_apples", "Golden apples", 0, 1, 0),
             ("count_arrows", "Arrows", 0, 1, 0), ("count_crystals", "Crystals", 0, 1, 0), ("count_wind_charges", "Wind charges", 0, 1, 0), ("count_xp_bottles", "XP bottles", 0, 1, 0),
             ("count_held", "Held item", 0, 1, 0), ("count_zero", "Show at zero", 0, 1, 1), ("text_color", "Value color", 0, 7, -1), ("panel", "Background", 0, 1, 0)],
