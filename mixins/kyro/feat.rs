@@ -587,10 +587,27 @@ $managerType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionM
 $propsType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties]
 $manager = Await ($managerType::RequestAsync()) $managerType
 $last = ''
+$seen = $null
 $retryAt = $null
 while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
     try {
-        $s = $manager.GetSessions() | Where-Object { $_.SourceAppUserModelId -like '*Spotify*' } | Select-Object -First 1
+        # Every app Windows knows is playing music; the ones switched off in Lyrics are skipped.
+        $all = @($manager.GetSessions())
+        if ($mode -eq 'pos') {
+            $names = ($all | ForEach-Object { $_.SourceAppUserModelId }) -join "`t"
+            if ($names -ne $seen) { $seen = $names; [Console]::Out.WriteLine("S`t$names") }
+        }
+        $off = @(((Get-Content 'horizon-mods\.horizon-mod-data\kyro\set_lyrics_text_apps_off' -Raw -ErrorAction SilentlyContinue) -split '\|') | Where-Object { $_ })
+        $open = @($all | Where-Object { $off -notcontains $_.SourceAppUserModelId })
+        $live = @($open | Where-Object { $_.GetPlaybackInfo().PlaybackStatus -eq 'Playing' })
+        if ($live.Count -gt 0) { $open = $live }
+        # Spotify first, then what Windows thinks you are using, then whatever is left.
+        $s = $open | Where-Object { $_.SourceAppUserModelId -like '*Spotify*' } | Select-Object -First 1
+        if ($null -eq $s) {
+            $now = $manager.GetCurrentSession()
+            if ($null -ne $now) { $s = $open | Where-Object { $_.SourceAppUserModelId -eq $now.SourceAppUserModelId } | Select-Object -First 1 }
+        }
+        if ($null -eq $s) { $s = $open | Select-Object -First 1 }
         if ($null -eq $s) { if ($mode -eq 'pos') { [Console]::Out.WriteLine('N') } } else {
             $p = Await ($s.TryGetMediaPropertiesAsync()) $propsType
             $t = $s.GetTimelineProperties()
@@ -785,6 +802,7 @@ fn media_line(parts: &[&str]) {
     };
     match parts {
         ["N"] => m.title.clear(),
+        ["S", apps @ ..] => horizon_client::options_ui::kyro_ring::set_media_apps(apps),
         ["C"] => {
             m.lyrics.clear();
             m.done = false;

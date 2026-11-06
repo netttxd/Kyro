@@ -443,7 +443,7 @@ fn settings_rect(width: f32, height: f32, id: &str) -> [f32; 4] {
     }
     let rows = settings_of(id).len() + usize::from(id != "ring_menu");
     let preview = if id.starts_with("cape_") { 148.0 } else { 0.0 };
-    let h = rows as f32 * ROW + HEADER + 8.0 + preview;
+    let h = (rows + app_rows(id)) as f32 * ROW + HEADER + 8.0 + preview;
     let [x, y, w, room] = sheet_area((width, height));
     [x, if h <= room { y } else { y + (room - h) / 2.0 }, w, h]
 }
@@ -800,7 +800,7 @@ fn list_rect(size: (f32, f32)) -> [f32; 4] {
 /// Beside the element, on the side of the screen with room: left half opens right, right half opens left.
 fn popup_rect(index: usize, size: (f32, f32)) -> [f32; 4] {
     let [x, y, w, _] = element_box(index).unwrap_or([size.0 / 2.0, size.1 / 2.0, 0.0, 0.0]);
-    let h = (settings_of(ELEMENTS[index].0).len() + 1) as f32 * ROW + HEADER + 8.0;
+    let h = (settings_of(ELEMENTS[index].0).len() + 1 + app_rows(ELEMENTS[index].0)) as f32 * ROW + HEADER + 8.0;
     let px = if x + w / 2.0 < size.0 / 2.0 { x + w + 6.0 } else { x - SETTINGS_W - 6.0 };
     [px.clamp(0.0, (size.0 - SETTINGS_W).max(0.0)), y.min(size.1 - h).max(0.0), SETTINGS_W, h]
 }
@@ -1369,8 +1369,88 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
             text(batch, atlas, &shown, track - 7.0 - HudBatch::text_width(atlas, &shown), ry + 2.0, white, false);
         }
     }
+    if id == "lyrics" {
+        ry += ROW;
+        text(batch, atlas, "Music apps", x + 11.0, ry + 2.0, soft(), false);
+        let apps = media_apps();
+        if apps.is_empty() {
+            ry += ROW;
+            text(batch, atlas, "Play some music and it shows up here", x + 11.0, ry + 2.0, soft(), false);
+        }
+        let off = apps_off();
+        for app in &apps {
+            ry += ROW;
+            if cursor.0 >= x && cursor.0 < x + w && cursor.1 >= ry - 4.0 && cursor.1 < ry + ROW - 4.0 {
+                notched(batch, atlas, x + 6.0, ry - 4.0, w - 12.0, ROW - 1.0, ca(3, 30));
+            }
+            text(batch, atlas, &app_name(app), x + 11.0, ry + 2.0, white, false);
+            let share = toggle_share(app);
+            switch_at(batch, atlas, right, ry, if off.contains(app) { 1.0 - share } else { share });
+        }
+    }
     let pop = fit(h, room);
     batch.scale_since(start, x + w / 2.0, y + h / 2.0, pop, pop);
+}
+
+static MEDIA_APPS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The apps Windows says are playing music, kept for the whole session.
+pub fn set_media_apps(apps: &[&str]) {
+    if let Ok(mut known) = MEDIA_APPS.lock() {
+        for app in apps.iter().filter(|a| !a.is_empty()) {
+            if !known.iter().any(|k| k == app) {
+                known.push((*app).to_owned());
+            }
+        }
+    }
+}
+
+fn apps_off() -> Vec<String> {
+    text_value("lyrics", "text_apps_off").split('|').filter(|a| !a.is_empty()).map(str::to_owned).collect()
+}
+
+/// Everything seen now, and anything switched off before, so its switch can be turned back on.
+fn media_apps() -> Vec<String> {
+    let mut apps = MEDIA_APPS.lock().map_or(Vec::new(), |k| k.clone());
+    for app in apps_off() {
+        if !apps.contains(&app) {
+            apps.push(app);
+        }
+    }
+    apps.sort_by_key(|a| app_name(a).to_lowercase());
+    apps.truncate(12);
+    apps
+}
+
+/// Rows the Lyrics sheet adds for its app switches: a title, then one each, or a hint.
+fn app_rows(id: &str) -> usize {
+    if id == "lyrics" { 1 + media_apps().len().max(1) } else { 0 }
+}
+
+/// Windows names apps by long ids: known ones read nicely, the rest lose the id's packaging.
+fn app_name(id: &str) -> String {
+    let low = id.to_lowercase();
+    const KNOWN: [(&str, &str); 16] = [("spotify", "Spotify"), ("applemusic", "Apple Music"), ("itunes", "iTunes"), ("soundcloud", "SoundCloud"), ("tidal", "Tidal"), ("deezer", "Deezer"), ("amazon", "Amazon Music"), ("youtube", "YouTube Music"), ("brave", "Brave"), ("chrome", "Chrome"), ("msedge", "Edge"), ("firefox", "Firefox"), ("308046b0af4a39cb", "Firefox"), ("opera", "Opera"), ("vlc", "VLC"), ("foobar", "foobar2000")];
+    if let Some((_, name)) = KNOWN.iter().find(|k| low.contains(k.0)) {
+        return (*name).to_owned();
+    }
+    let tail = id.rsplit(['\\', '/']).next().unwrap_or(id);
+    let tail = tail.split('!').next().unwrap_or(tail).split('_').next().unwrap_or(tail).trim_end_matches(".exe");
+    tail.rsplit('.').next().unwrap_or(tail).to_owned()
+}
+
+fn toggle_app(app: &str) {
+    if let Ok(mut toggled) = TOGGLED.lock() {
+        toggled.retain(|e| e.0 != app);
+        toggled.push((app.to_owned(), true, Instant::now()));
+    }
+    let mut off = apps_off();
+    if off.iter().any(|a| a == app) {
+        off.retain(|a| a != app);
+    } else {
+        off.push(app.to_owned());
+    }
+    set_text("lyrics", "text_apps_off", off.join("|"));
 }
 
 fn click_settings(cursor: (f32, f32), size: (f32, f32), id: &'static str, right: bool) {
@@ -1396,6 +1476,12 @@ fn click_panel(cursor: (f32, f32), size: (f32, f32), id: &'static str) {
     let right = x + w - 12.0;
     if row == 0.0 {
         toggle(id);
+        return;
+    }
+    if id == "lyrics" && row as usize >= settings_of(id).len() + 2 {
+        if let Some(app) = media_apps().get(row as usize - settings_of(id).len() - 2) {
+            toggle_app(app);
+        }
         return;
     }
     let Some((key, _, min, max, _)) = settings_of(id).get(row as usize - 1).copied() else {
@@ -1474,7 +1560,7 @@ pub fn take_raised() -> bool {
 static LISTENING: Mutex<Option<&'static str>> = Mutex::new(None);
 static TEXT_FOCUS: Mutex<Option<(&'static str, &'static str)>> = Mutex::new(None);
 static TEXTS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
-const TEXT_ROWS: [(&str, &str); 2] = [("better_chat", "text_filter"), ("freelook", "text_blocked")];
+const TEXT_ROWS: [(&str, &str); 3] = [("better_chat", "text_filter"), ("freelook", "text_blocked"), ("lyrics", "text_apps_off")];
 
 /// A text setting; comma separated lists go through here.
 pub fn text_value(id: &str, key: &str) -> String {
