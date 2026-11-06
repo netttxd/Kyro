@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $id = 'kyro'
-$version = '1.0.1'
+$version = '2.0.0'
 $bundle = Join-Path $PSScriptRoot "mixins\$id"
 $dist = Join-Path $PSScriptRoot 'dist'
 New-Item -ItemType Directory -Force $dist | Out-Null

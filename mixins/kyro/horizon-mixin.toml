@@ -1,6 +1,6 @@
 [mod]
 id = "kyro"
-version = "1.0.1"
+version = "2.0.0"
 priority = 100
 
 # Raw targets are exact functions of one Horizon commit. Pin it (generate --horizon-revision SHA):
