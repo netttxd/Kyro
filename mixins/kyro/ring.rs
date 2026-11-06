@@ -896,8 +896,10 @@ fn draw_hud_editor(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32)) {
         text(batch, atlas, tip, tx, ty, seltxt(), false);
         batch.scale_since(start, size.0 / 2.0, ty + 4.0, tk, tk);
     }
+    let (list_age, popup_age) = pop_ages(list, popup);
     if list {
         let [x, y, w, h] = list_rect(size);
+        let first = batch.vertices.len();
         frame(batch, atlas, x, y, w, h);
         batch.fill(atlas, x, y, w, HEADER - 4.0, sel());
         text(batch, atlas, "Elements", x + 9.0, y + 6.0, seltxt(), false);
@@ -914,10 +916,45 @@ fn draw_hud_editor(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32)) {
             text(batch, atlas, name, rx, ry + 3.0, white, false);
             switch_of(batch, atlas, rx + 136.0, ry + 1.0, id);
         }
+        ease_in(batch, first, [x, y, w, h], list_age);
     }
     if let Some(index) = popup {
+        let first = batch.vertices.len();
         draw_panel(batch, atlas, cursor, ELEMENTS[index]);
+        ease_in(batch, first, popup_rect(index, size), popup_age);
     }
+}
+
+static POPS: Mutex<(bool, Option<usize>, Option<Instant>, Option<Instant>)> = Mutex::new((false, None, None, None));
+
+/// Seconds since the Elements list and the popup opened, for the frame that draws them.
+fn pop_ages(list: bool, popup: Option<usize>) -> (f32, f32) {
+    let Ok(mut pops) = POPS.lock() else {
+        return (1.0, 1.0);
+    };
+    let now = Instant::now();
+    if list && !pops.0 {
+        pops.2 = Some(now);
+    }
+    if popup.is_some() && pops.1 != popup {
+        pops.3 = Some(now);
+    }
+    pops.0 = list;
+    pops.1 = popup;
+    let age = |t: Option<Instant>| t.map_or(1.0, |t| t.elapsed().as_secs_f32());
+    (age(pops.2), age(pops.3))
+}
+
+/// A panel grows a little and fades in over its first moment.
+fn ease_in(batch: &mut HudBatch, first: usize, [x, y, w, h]: [f32; 4], age: f32) {
+    let t = (age / 0.13).min(1.0);
+    if t >= 1.0 {
+        return;
+    }
+    let eased = 1.0 - (1.0 - t) * (1.0 - t);
+    let scale = 0.94 + 0.06 * eased;
+    batch.scale_since(first, x + w / 2.0, y + h / 2.0, scale, scale);
+    fade_since(batch, first, eased);
 }
 
 fn click_hud_editor(cursor: (f32, f32), size: (f32, f32), right: bool) {
@@ -1332,7 +1369,8 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
                 batch.fill(atlas, bx + 3.5, ry + 3.0, 1.0, 5.0, white);
             }
         } else if *min == 0 && *max == 1 {
-            switch(batch, atlas, right, ry, current == 1);
+            let share = toggle_share(&format!("{id}.{key}"));
+            switch_at(batch, atlas, right, ry, if current == 1 { share } else { 1.0 - share });
         } else {
             let choices: &[&str] = match *key {
                 "time" => &["Real", "Sunrise", "Morning", "Noon", "Sunset", "Night", "Midnight"],
@@ -1361,7 +1399,7 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
                 current.to_string()
             };
             let track = right - SLIDER_W;
-            let share = (current - min) as f32 / (max - min).max(1) as f32;
+            let share = glide(&format!("{id}.{key}"), (current - min) as f32 / (max - min).max(1) as f32);
             batch.fill(atlas, track, ry + 4.0, SLIDER_W, 3.0, line());
             batch.fill(atlas, track, ry + 4.0, SLIDER_W * share, 3.0, accent());
             batch.fill(atlas, track + SLIDER_W * share - 3.0, ry + 1.0, 6.0, 9.0, sel());
@@ -1440,10 +1478,7 @@ fn app_name(id: &str) -> String {
 }
 
 fn toggle_app(app: &str) {
-    if let Ok(mut toggled) = TOGGLED.lock() {
-        toggled.retain(|e| e.0 != app);
-        toggled.push((app.to_owned(), true, Instant::now()));
-    }
+    mark_toggle(app);
     let mut off = apps_off();
     if off.iter().any(|a| a == app) {
         off.retain(|a| a != app);
@@ -1508,6 +1543,7 @@ fn click_panel(cursor: (f32, f32), size: (f32, f32), id: &'static str) {
             set_value(id, key, index as i32);
         }
     } else if min == 0 && max == 1 {
+        mark_toggle(&format!("{id}.{key}"));
         set_value(id, key, 1 - value(id, key));
     } else {
         if cursor.0 >= right - SLIDER_W - 6.0 {
@@ -1522,6 +1558,21 @@ fn click_panel(cursor: (f32, f32), size: (f32, f32), id: &'static str) {
 fn slide(at: f32, right: f32, id: &str, key: &str, min: i32, max: i32) {
     let share = ((at - (right - SLIDER_W)) / SLIDER_W).clamp(0.0, 1.0);
     set_value(id, key, min + (share * (max - min) as f32).round() as i32);
+}
+
+static GLIDES: LazyLock<Mutex<HashMap<String, (f32, Instant)>>> = LazyLock::new(Default::default);
+
+/// Where a slider's knob is drawn: on its way to `target`. A knob not drawn lately starts there.
+fn glide(name: &str, target: f32) -> f32 {
+    let Ok(mut glides) = GLIDES.lock() else {
+        return target;
+    };
+    let now = Instant::now();
+    let (at, then) = glides.get(name).copied().unwrap_or((target, now));
+    let dt = now.duration_since(then).as_secs_f32();
+    let next = if dt > 0.25 { target } else { at + (target - at) * (1.0 - (-dt * 28.0).exp()) };
+    glides.insert(name.to_owned(), (next, now));
+    next
 }
 
 const SLIDER_W: f32 = 92.0;
@@ -2115,11 +2166,16 @@ fn toggle_share(id: &str) -> f32 {
     TOGGLED.lock().ok().and_then(|t| t.iter().find(|e| e.0 == id).map(|e| (e.2.elapsed().as_secs_f32() / 0.14).min(1.0))).unwrap_or(1.0)
 }
 
-fn toggle(id: &str) {
+/// Starts a switch's slide.
+fn mark_toggle(name: &str) {
     if let Ok(mut toggled) = TOGGLED.lock() {
-        toggled.retain(|e| e.0 != id && e.2.elapsed().as_secs_f32() < 1.0);
-        toggled.push((id.to_owned(), !on(id), Instant::now()));
+        toggled.retain(|e| e.0 != name && e.2.elapsed().as_secs_f32() < 1.0);
+        toggled.push((name.to_owned(), true, Instant::now()));
     }
+}
+
+fn toggle(id: &str) {
+    mark_toggle(id);
     if id.starts_with("theme_") && id != "theme_colors" {
         with(|s| {
             for (other, _, _) in THEMES {
