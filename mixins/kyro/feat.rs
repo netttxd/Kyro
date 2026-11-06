@@ -583,6 +583,15 @@ $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
     $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1
 function Ms($v) { $n = 0.0; foreach ($part in ($v -split ':')) { $n = $n * 60 + [double]::Parse($part.TrimEnd('s'), [Globalization.CultureInfo]::InvariantCulture) }; [long]($n * 1000) }
 function Await($op, $type) { $asTask.MakeGenericMethod($type).Invoke($null, @($op)).GetAwaiter().GetResult() }
+# Video sites name songs for people: "Artist - Song (Official Video)" by "ArtistVEVO". Lyric sites want the song.
+function Tidy-Track($title, $artist, $loose) {
+    if (-not $loose) { return $title, $artist }
+    $t = $title -replace '\s*[\(\[][^\)\]]*(official|video|audio|lyric|visuali[sz]er|\bhd\b|\b4k\b|\bmv\b)[^\)\]]*[\)\]]', ''
+    $t = ($t -replace '\s*\|.*$', '' -replace '\s+(ft|feat)\.?\s.*$', '').Trim()
+    $a = ($artist -replace 'VEVO$', '' -replace '\s*-\s*Topic$', '' -replace '\s*Official$', '').Trim()
+    if ($t -match '^(.+?)\s+[-\u2013\u2014]\s+(.+)$') { $a = $Matches[1].Trim(); $t = $Matches[2].Trim() }
+    return $t, $a
+}
 $managerType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]
 $propsType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties]
 $manager = Await ($managerType::RequestAsync()) $managerType
@@ -624,6 +633,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                 $fresh = $key -ne $last
                 $online = (Get-Content 'horizon-mods\.horizon-mod-data\kyro\set_lyrics_online' -ErrorAction SilentlyContinue) -ne '0'
                 $last = $key
+                $song, $singer = Tidy-Track $p.Title $p.Artist ($s.SourceAppUserModelId -notlike '*Spotify*')
                 [Console]::Out.WriteLine('C')
                 try {
                     if ($null -ne $p.Thumbnail) {
@@ -642,8 +652,8 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                                 $img.Dispose(); $img = $sharp
                                 throw 'saved'
                             }
-                            $clean = ($p.Title -replace '\s+-\s.*$|\s*[\(\[].*$', '').Trim()
-                            $first = ($p.Artist -split '[,&]')[0].Trim()
+                            $clean = ($song -replace '\s+-\s.*$|\s*[\(\[].*$', '').Trim()
+                            $first = ($singer -split '[,&]')[0].Trim()
                             if (-not $online) { throw 'offline' }
                             $found = Invoke-RestMethod -Uri ('https://itunes.apple.com/search?media=music&entity=song&limit=10&term=' + [uri]::EscapeDataString("$first $clean")) -TimeoutSec 8
                             $hit = $found.results | Where-Object { $_.trackName -and $_.trackName.StartsWith($clean, [StringComparison]::OrdinalIgnoreCase) -and $_.artistName -and $_.artistName.IndexOf($first, [StringComparison]::OrdinalIgnoreCase) -ge 0 } | Select-Object -First 1
@@ -675,7 +685,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                 $word = $false
                 try {
                     if (-not $online) { throw 'offline' }
-                    $u = 'https://api.betterlyrics.org/getLyrics?s=' + [uri]::EscapeDataString($p.Title) + '&a=' + [uri]::EscapeDataString($p.Artist) + '&al=' + [uri]::EscapeDataString($p.AlbumTitle) + '&d=' + [long]$t.EndTime.TotalSeconds
+                    $u = 'https://api.betterlyrics.org/getLyrics?s=' + [uri]::EscapeDataString($song) + '&a=' + [uri]::EscapeDataString($singer) + '&al=' + [uri]::EscapeDataString($p.AlbumTitle) + '&d=' + [long]$t.EndTime.TotalSeconds
                     $b = Invoke-RestMethod -Uri $u -UserAgent 'Kyro (Minecraft mod; https://lrclib.net)' -TimeoutSec 6
                     if ($b.ttml -and ($null -eq $b.score -or $b.score -ge 0.8)) {
                         $doc = New-Object System.Xml.XmlDocument
@@ -711,8 +721,8 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                             $body = [System.Net.WebUtility]::HtmlDecode($m.Groups[1].Value)
                             $ti = [regex]::Match($body, '\[ti:([^\]]*)\]')
                             $ar = [regex]::Match($body, '\[ar:([^\]]*)\]')
-                            $lead = & $fold (($p.Artist -split '[,&]')[0])
-                            if ((-not $ti.Success -or (& $fold $ti.Groups[1].Value) -eq (& $fold $p.Title)) -and (-not $ar.Success -or (& $fold $ar.Groups[1].Value).Contains($lead))) {
+                            $lead = & $fold (($singer -split '[,&]')[0])
+                            if ((-not $ti.Success -or (& $fold $ti.Groups[1].Value) -eq (& $fold $song)) -and (-not $ar.Success -or (& $fold $ar.Groups[1].Value).Contains($lead))) {
                                 foreach ($raw in ($body -split "`r?`n")) {
                                     $line = [regex]::Match($raw.Trim(), '^\[(\d+),(\d+)\](.*)$')
                                     if (-not $line.Success) { continue }
@@ -741,13 +751,13 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                 } catch { }
                 try {
                     if ($word -or -not $online) { throw 'done' }
-                    $q = 'track_name=' + [uri]::EscapeDataString($p.Title) + '&artist_name=' + [uri]::EscapeDataString($p.Artist) + '&duration=' + [long]$t.EndTime.TotalSeconds
+                    $q = 'track_name=' + [uri]::EscapeDataString($song) + '&artist_name=' + [uri]::EscapeDataString($singer) + '&duration=' + [long]$t.EndTime.TotalSeconds
                     $r = $null
                     try { $r = Invoke-RestMethod -Uri "https://lrclib.net/api/get?$q" -UserAgent 'Kyro (https://lrclib.net)' -TimeoutSec 8 } catch { }
                     if ($null -eq $r -or -not $r.syncedLyrics) {
                         # As Java: a looser search on the cleaned title and first artist.
-                        $name = ($p.Title -replace '\s+-\s.*$|\s*[\(\[].*$', '').Trim()
-                        $lead = ($p.Artist -split '[,&]')[0].Trim()
+                        $name = ($song -replace '\s+-\s.*$|\s*[\(\[].*$', '').Trim()
+                        $lead = ($singer -split '[,&]')[0].Trim()
                         $list = Invoke-RestMethod -Uri ('https://lrclib.net/api/search?q=' + [uri]::EscapeDataString("$name $lead")) -UserAgent 'Kyro (https://lrclib.net)' -TimeoutSec 8
                         $r = $list | Where-Object { $_.syncedLyrics } | Select-Object -First 1
                     }
