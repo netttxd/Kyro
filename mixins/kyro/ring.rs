@@ -245,7 +245,7 @@ fn set_value(id: &str, key: &str, value: i32) {
 }
 
 /// The saved file for a mod's switch.
-pub fn on_file(id: &str) -> String {
+fn on_file(id: &str) -> String {
     format!("on_{id}")
 }
 
@@ -261,6 +261,9 @@ pub fn data_dir() -> Option<std::path::PathBuf> {
 
 /// Loads the saved settings from disk once, whichever hook asks first.
 pub fn ensure_loaded() {
+    if with(|s| s.loaded) {
+        return;
+    }
     let dir = data_dir();
     load(|key| std::fs::read_to_string(dir.as_ref()?.join(key)).ok().map(|v| v.trim().to_owned()));
 }
@@ -305,8 +308,17 @@ fn load(get: impl Fn(&str) -> Option<String>) {
     });
 }
 
-pub fn take_saved() -> Vec<(String, String)> {
-    with(|s| std::mem::take(&mut s.saved))
+/// Writes the settings changed since the last call, one file each.
+pub fn save_changed() {
+    let changed = with(|s| std::mem::take(&mut s.saved));
+    let Some(dir) = data_dir().filter(|_| !changed.is_empty()) else {
+        return;
+    };
+    for (key, value) in changed {
+        if let Err(error) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(dir.join(&key), value)) {
+            log::warn!("kyro setting {key} not saved: {error}");
+        }
+    }
 }
 
 pub fn shows(options: &OptionsUi) -> bool {
@@ -1388,7 +1400,7 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
             text(batch, atlas, &shown, track - 7.0 - HudBatch::text_width(atlas, &shown), ry + 2.0, white, false);
         }
     }
-    if id == "lyrics" {
+    if has_apps(id) {
         ry += ROW;
         text(batch, atlas, "Music apps", x + 11.0, ry + 2.0, soft(), false);
         let apps = media_apps();
@@ -1441,15 +1453,20 @@ fn media_apps() -> Vec<String> {
     apps
 }
 
-/// Rows the Lyrics sheet adds for its app switches: a title, then one each, or a hint.
+/// Whether a mod's page lists the music apps under its settings.
+fn has_apps(id: &str) -> bool {
+    id == "lyrics"
+}
+
 /// The page's first music app row: after the switch, the settings and the "Music apps" title,
 /// in the order the panel draws them.
 fn first_app_row(id: &str) -> usize {
     1 + settings_of(id).len() + 1
 }
 
+/// Rows the Lyrics sheet adds for its app switches: a title, then one each, or a hint.
 fn app_rows(id: &str) -> usize {
-    if id == "lyrics" { 1 + media_apps().len().max(1) } else { 0 }
+    if has_apps(id) { 1 + media_apps().len().max(1) } else { 0 }
 }
 
 /// Windows names apps by long ids: known ones read nicely, the rest lose the id's packaging.
@@ -1500,7 +1517,7 @@ fn click_panel(cursor: (f32, f32), size: (f32, f32), id: &'static str) {
         toggle(id);
         return;
     }
-    if id == "lyrics" && row as usize >= first_app_row(id) {
+    if has_apps(id) && row as usize >= first_app_row(id) {
         if let Some(app) = media_apps().get(row as usize - first_app_row(id)) {
             toggle_app(app);
         }

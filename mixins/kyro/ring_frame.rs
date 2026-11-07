@@ -89,7 +89,6 @@ fn post(input: PostInput) -> vec4<f32> {
     return vec4<f32>(sqrt(sum / f32(samples)), input.color.a);
 }
 "#;
-    use crate::game::port_kyro as p;
     use horizon_client::options_ui::kyro_ring as m;
     m::ensure_loaded();
     game.settings.extras.own_name_tag = m::on("own_nametag");
@@ -216,9 +215,7 @@ fn post(input: PostInput) -> vec4<f32> {
             renderer.drop_shader_packs();
         }
     }
-    for (key, value) in m::take_saved() {
-        game.native_set_setting(p::ID, &key, &value);
-    }
+    m::save_changed();
     // The glint's look lives in loaded resources, so it needs a reload, but only when it really
     // changed: Speed and Strength apply live, and a color put back needs nothing.
     static GLINT: std::sync::Mutex<Option<[i32; 5]>> = std::sync::Mutex::new(None);
