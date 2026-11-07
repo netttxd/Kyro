@@ -2679,12 +2679,18 @@ fn click_page(cursor: (f32, f32), size: (f32, f32), right_click: bool) {
 pub fn cape_uv(id: &str, r: [f32; 4]) -> [f32; 4] {
     const CELL_PX: (f32, f32) = (88.0, 68.0);
     static START: LazyLock<Instant> = LazyLock::new(Instant::now);
-    let animated = !matches!(&id[5..], "crest" | "red_crane" | "first_snow" | "kyro_sigil" | "kintsugi");
+    let animated = !still_cape(id);
     let (sheet_w, sheet_h) = if animated { (704.0, 272.0) } else { CELL_PX };
     let frame = if animated { (START.elapsed().as_millis() / 50 % 32) as u32 } else { 0 };
     let (du, dv) = ((r[2] - r[0]) / sheet_w, (r[3] - r[1]) / sheet_h);
     let (u, v) = (r[0] + (frame % 8) as f32 * CELL_PX.0 * du, r[1] + (frame / 8) as f32 * CELL_PX.1 * dv);
     [u, v, u + 256.0 * du, v + 128.0 * dv]
+}
+
+/// Whether a cape is listed under Still, so its sheet is one picture, not 32 frames.
+fn still_cape(id: &str) -> bool {
+    let capes = MODS[4];
+    capes.iter().position(|e| e.0 == "#" && e.1 == "Still").is_some_and(|at| capes[at..].iter().any(|e| e.0 == id))
 }
 
 /// The sprite holding a cape's sheet.
@@ -2757,4 +2763,98 @@ fn layout(items: &[(&'static str, &'static str, bool)]) -> (Vec<(f32, f32)>, f32
         }
     }
     (places, if col > 0.0 { row + 1.0 } else { row })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ids(category: usize) -> impl Iterator<Item = &'static str> {
+        MODS[category].iter().map(|e| e.0).filter(|id| *id != "#")
+    }
+
+    fn all_ids() -> Vec<&'static str> {
+        (0..MODS.len()).flat_map(ids).collect()
+    }
+
+    #[test]
+    fn saved_colors_decode() {
+        // Saved files hold these numbers, so they must keep meaning the same colors.
+        assert_eq!(color_of(0), 0xffffff);
+        assert_eq!(color_of(1), 0xff5555);
+        assert_eq!(color_of(7), 0xff55ff);
+        assert_eq!(color_of(0x1000000 | 0x123456), 0x123456);
+        assert_eq!(rgb(0x123456), [0x12, 0x34, 0x56]);
+        assert_eq!(mix(0x000000, 0xffffff, 0.5), 0x7f7f7f);
+    }
+
+    #[test]
+    fn saved_settings_load() {
+        let files: HashMap<&str, &str> = [("on_glint_color", "true"), ("set_glint_color_armor_color", "3"), ("on_fps", "false")].into();
+        load(|key| files.get(key).map(|v| (*v).to_owned()));
+        assert!(on("glint_color"));
+        assert!(!on("fps"));
+        assert_eq!(value("glint_color", "armor_color"), 3);
+        // Unsaved settings take the default the menu shows.
+        assert_eq!(value("glint_color", "color"), 1);
+        assert!(on("crosshair"));
+    }
+
+    #[test]
+    fn ids_are_unique() {
+        let all = all_ids();
+        let mut seen = std::collections::HashSet::new();
+        for id in &all {
+            assert!(seen.insert(*id), "{id} is listed twice");
+        }
+    }
+
+    #[test]
+    fn settings_defaults_fit() {
+        for id in all_ids() {
+            for (key, label, min, max, default) in settings_of(id) {
+                let kind = key.starts_with("key_") || key.starts_with("text_") || key.starts_with("note_") || min == max;
+                // -1 is "the theme's own color" for color settings.
+                let themed = *default == -1 && key.ends_with("color");
+                assert!(kind || themed || (min..=max).contains(&default), "{id}.{key} ({label}): {default} outside {min}..={max}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_key_has_a_row() {
+        let rows: Vec<String> = all_ids().iter().flat_map(|id| settings_of(id).iter().map(|e| e.0)).filter_map(|k| k.strip_prefix("key_")).map(str::to_owned).collect();
+        for [name, _, default] in KEYS {
+            assert!(rows.iter().any(|r| r == name), "key {name} has no Key row");
+            assert!(default.starts_with("key.keyboard."), "{name}: {default}");
+        }
+        for row in &rows {
+            assert!(KEYS.iter().any(|k| k[0] == row), "Key row {row} binds nothing");
+        }
+    }
+
+    #[test]
+    fn themes_match_their_cards() {
+        let listed: Vec<&str> = ids(5).filter(|id| *id != "theme_colors").collect();
+        let themes: Vec<&str> = THEMES.iter().map(|t| t.0).collect();
+        assert_eq!(listed, themes);
+        assert_eq!(THEMES[GLASS].0, "theme_glass");
+        assert!(THEMES[FIRST_ANIMATED..].iter().all(|t| MODS[5].iter().position(|e| e.0 == t.0) > MODS[5].iter().position(|e| e.1 == "Animated")));
+        let keys: Vec<&str> = settings_of("theme_colors").iter().map(|e| e.0).collect();
+        assert_eq!(keys, COLOR_KEYS);
+    }
+
+    #[test]
+    fn hud_elements_are_mods() {
+        let all = all_ids();
+        for (id, _) in ELEMENTS {
+            assert!(all.contains(&id), "HUD element {id} has no switch");
+        }
+    }
+
+    #[test]
+    fn still_capes_are_one_picture() {
+        assert!(still_cape("cape_kintsugi"));
+        assert!(!still_cape("cape_black_hole"));
+    }
 }
