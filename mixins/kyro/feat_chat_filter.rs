@@ -3,7 +3,7 @@ fn kyro_feat_chat_filter(this: &Chat, height: i32, ticks: f32, focused: bool) ->
     thread_local! {
         static NESTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     }
-    let query = crate::options_ui::kyro_ring::chat_query().to_lowercase();
+    let query = crate::options_ui::kyro_world::chat_query().to_lowercase();
     if NESTED.get() || !focused || query.is_empty() {
         return core::ops::ControlFlow::Continue(());
     }

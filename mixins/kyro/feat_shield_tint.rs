@@ -24,7 +24,7 @@ fn kyro_feat_shield_tint(
     thread_local! {
         static NESTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     }
-    let tint = crate::options_ui::kyro_ring::shield_tint();
+    let tint = crate::options_ui::kyro_world::shield_tint();
     if NESTED.get() || tint == 0 || !matches!(model.kind, SpecialKind::Shield) {
         return core::ops::ControlFlow::Continue(());
     }

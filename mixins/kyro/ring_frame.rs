@@ -97,7 +97,7 @@ fn post(input: PostInput) -> vec4<f32> {
     }
     game.settings.extras.own_name_tag = m::on("own_nametag");
     horizon_core::kyro_shared::SHINY_POTIONS.store(m::on("shiny_potions"), std::sync::atomic::Ordering::Relaxed);
-    m::set_own_name(game.own_profile_name());
+    horizon_client::options_ui::kyro_world::set_own_name(game.own_profile_name());
     // Glass uses the game's own menu blur, at its slider, and gives the option back on close.
     if let Some(blur) = m::glass_blur() {
         if m::own_blur().is_none() {
@@ -116,20 +116,20 @@ fn post(input: PostInput) -> vec4<f32> {
         }
     }
     if game.screen != crate::game::Screen::Chat {
-        m::chat_closed();
+        horizon_client::options_ui::kyro_world::chat_closed();
     }
     crate::game::kyro_feat::shield_delay(game);
     crate::game::kyro_feat::track_kills(game);
     // Your shield: the server's cooldown, the local one, or the disable event, whichever is known.
     let shield = [game.offhand.as_ref(), game.held()].into_iter().flatten().find(|s| s.item.ends_with(":shield")).map(|s| s.item.to_string());
     let wait = shield.map_or(0.0_f32, |item| game.cooldowns.percent(&item, 0.0)).max((game.shield_cooldown as f32 / 100.0).min(1.0)).max(crate::game::kyro_feat::shield_wait(u32::MAX));
-    m::set_shield_tint(m::shield_color(wait));
+    horizon_client::options_ui::kyro_world::set_shield_tint(horizon_client::options_ui::kyro_world::shield_color(wait));
     let held_shield = |s: Option<&crate::game::ItemStack>| s.is_some_and(|s| s.item.ends_with(":shield"));
     let (main, off) = (held_shield(game.held()), held_shield(game.offhand.as_ref()));
     if game.settings.main_hand_left {
-        m::set_shield_arms(main, off);
+        horizon_client::options_ui::kyro_world::set_shield_arms(main, off);
     } else {
-        m::set_shield_arms(off, main);
+        horizon_client::options_ui::kyro_world::set_shield_arms(off, main);
     }
     // A disabled shield can't stay up, even when no cooldown packet reached this client.
     if wait > 0.0 && game.using.and_then(|(slot, _)| game.stack_in(slot)).is_some_and(|s| s.item.ends_with(":shield")) {
@@ -139,9 +139,9 @@ fn post(input: PostInput) -> vec4<f32> {
     if game.title.is_none() && game.player.is_some() {
         crate::game::kyro_feat::session_tick(&format!("{:?}", game.native_player().map(|p| p.dimension)));
     }
-    m::set_player_spots(game.mobs.iter().filter(|e| &*e.kind.id == "minecraft:player").map(|e| [e.position.x, e.position.y, e.position.z]).collect());
+    horizon_client::options_ui::kyro_world::set_player_spots(game.mobs.iter().filter(|e| &*e.kind.id == "minecraft:player").map(|e| [e.position.x, e.position.y, e.position.z]).collect());
     m::set_shift(game.modifiers.shift_key());
-    m::set_f3(game.keys.contains(&winit::keyboard::KeyCode::F3));
+    horizon_client::options_ui::kyro_world::set_f3(game.keys.contains(&winit::keyboard::KeyCode::F3));
     // Keep chat: the last lines saved for next launch, and read back, greyed and faded, once a world is up.
     if m::on("better_chat") && m::value("better_chat", "keep") == 1 && game.player.is_some() {
         thread_local! {
@@ -152,11 +152,11 @@ fn post(input: PostInput) -> vec4<f32> {
         if !restored {
             let text = file().and_then(|f| std::fs::read_to_string(f).ok()).unwrap_or_default();
             let logging = std::mem::replace(&mut game.ui.chat.log, false);
-            m::set_chat_restoring(true);
+            horizon_client::options_ui::kyro_world::set_chat_restoring(true);
             for line in text.lines().rev() {
                 game.ui.chat.add(&game.gui.atlas, horizon_client::text::Text::colored(line, 0x9a9a9a), None, horizon_client::chat::ChatSource::Server, 0, false);
             }
-            m::set_chat_restoring(false);
+            horizon_client::options_ui::kyro_world::set_chat_restoring(false);
             game.ui.chat.log = logging;
             LOG.set((true, game.ui.chat.received, None));
         } else if game.ui.chat.received != seen && at.is_none_or(|t| t.elapsed().as_secs() >= 5) {
@@ -167,13 +167,13 @@ fn post(input: PostInput) -> vec4<f32> {
             LOG.set((true, game.ui.chat.received, Some(std::time::Instant::now())));
         }
     }
-    if m::players_due() {
+    if horizon_client::options_ui::kyro_world::players_due() {
         let list = game.remote_tab_players().map_or(Vec::new(), |(players, _, _)| players.into_iter().map(|t| {
             let nick = t.display_name.as_ref().map(|d| horizon_client::scoreboard::comp_text(d).plain()).unwrap_or_default();
             let nick = nick.split_whitespace().last().unwrap_or("").trim_matches(|c: char| !c.is_alphanumeric() && c != '_').to_owned();
             (t.name, t.skin, t.uuid, nick)
         }).collect());
-        m::set_players(list);
+        horizon_client::options_ui::kyro_world::set_players(list);
     }
     if m::on("glint_color") {
         for (option, key) in [("glintSpeed", "speed"), ("glintStrength", "strength")] {
@@ -183,9 +183,9 @@ fn post(input: PostInput) -> vec4<f32> {
             }
         }
     }
-    m::set_reach(game.entity_reach);
+    horizon_client::options_ui::kyro_world::set_reach(game.entity_reach);
     if game.title.is_some() {
-        m::server_left(); // Back at the menu: the next world may be singleplayer.
+        horizon_client::options_ui::kyro_world::server_left(); // Back at the menu: the next world may be singleplayer.
         crate::game::kyro_feat::world_reset();
         crate::game::kyro_feat::session_reset();
     }
@@ -197,7 +197,7 @@ fn post(input: PostInput) -> vec4<f32> {
         let _ = game.options_key(winit::keyboard::KeyCode::Escape, None);
     }
     if let Some(eye) = game.eye_position() {
-        m::set_eye(eye);
+        horizon_client::options_ui::kyro_world::set_eye(eye);
     }
     // Color saturation and Motion blur run as Kyro's post pack, never over a pack you picked.
     const PACK: &str = "native-kyro";

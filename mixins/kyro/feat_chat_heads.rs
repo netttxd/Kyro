@@ -9,7 +9,7 @@ fn kyro_feat_chat_heads(value: Vec<GuiDraw>) -> Vec<GuiDraw> {
         let face = match &draw {
             GuiDraw::Text { text, x, y, color, .. } => {
                 let plain = text.plain();
-                plain.starts_with("   ").then(|| ring::line_skin(&plain)).flatten().map(|skin| (skin, *x, *y, *color))
+                plain.starts_with("   ").then(|| crate::options_ui::kyro_world::line_skin(&plain)).flatten().map(|skin| (skin, *x, *y, *color))
             }
             _ => None,
         };

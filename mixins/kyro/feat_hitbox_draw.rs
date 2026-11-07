@@ -22,14 +22,14 @@ fn kyro_feat_hitbox_draw(
         if !living && ring::value("reach_hitbox", "living") == 1 {
             return core::ops::ControlFlow::Break(());
         }
-        if !ring::player_at(position) && ring::value("reach_hitbox", "players") == 1 {
+        if !crate::options_ui::kyro_world::player_at(position) && ring::value("reach_hitbox", "players") == 1 {
             return core::ops::ControlFlow::Break(());
         }
     }
-    let eye = ring::eye();
+    let eye = crate::options_ui::kyro_world::eye();
     let near: f64 = (0..3).map(|i| (min[i] - eye[i]).max(eye[i] - max[i]).max(0.0).powi(2)).sum();
     let colored = ring::value("reach_hitbox", "reach") == 1;
-    let color = if colored && near > 0.0 && near.sqrt() <= ring::reach() {
+    let color = if colored && near > 0.0 && near.sqrt() <= crate::options_ui::kyro_world::reach() {
         0xff000000 | ring::color_of(ring::value("reach_hitbox", "reach_color"))
     } else {
         (if colored { 0x70000000 } else { 0xff000000 }) | ring::color_of(ring::value("reach_hitbox", "color"))

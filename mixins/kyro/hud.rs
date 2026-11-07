@@ -51,7 +51,7 @@
 // |    markers.render(graphics);
 // |    combo.render(graphics);
 // | });
-fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch, corners: &mut horizon_client::extras_hud::Corners) {
+fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch) {
     use crate::game::port_kyro as m;
     horizon_client::options_ui::kyro_ring::set_screen(batch.width, batch.height);
     // Turned off in Options > Mods: nothing until the next build leaves it out.
@@ -373,7 +373,7 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             rows.push(("reach", "Reach".to_owned(), crate::game::kyro_feat::reach().map_or("--".to_owned(), |r| format!("{r:.2}"))));
         }
         if ring::on("server") {
-            let address = ring::server();
+            let address = horizon_client::options_ui::kyro_world::server();
             let shown = if address.is_empty() {
                 "Singleplayer".to_owned()
             } else if ring::value("server", "hide") == 1 {
@@ -384,7 +384,7 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             rows.push(("server", "Server".to_owned(), shown));
         }
         if ring::on("tps") {
-            let tps = if ring::server().is_empty() { 20.0 } else { crate::game::kyro_feat::tps() };
+            let tps = if horizon_client::options_ui::kyro_world::server().is_empty() { 20.0 } else { crate::game::kyro_feat::tps() };
             rows.push(("tps", "TPS".to_owned(), if tps < 0.0 { "--".to_owned() } else { format!("{tps:.1}") }));
         }
         if ring::on("session") {

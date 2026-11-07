@@ -8,9 +8,9 @@ fn kyro_feat_hand_tint(game: &mut crate::game::Game<'_>, alpha: f64) -> core::op
         return core::ops::ControlFlow::Continue(());
     }
     NESTED.set(true);
-    ring::hold_shield_tint(Some(ring::own_shield_color()));
+    horizon_client::options_ui::kyro_world::hold_shield_tint(Some(horizon_client::options_ui::kyro_world::own_shield_color()));
     let out = game.hand_geometry(alpha);
-    ring::hold_shield_tint(None);
+    horizon_client::options_ui::kyro_world::hold_shield_tint(None);
     NESTED.set(false);
     core::ops::ControlFlow::Break(out)
 }

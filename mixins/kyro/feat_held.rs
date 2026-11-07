@@ -21,7 +21,7 @@ fn kyro_feat_held(left: bool, inverse_height: f32, attack: f32, item: ItemPose) 
             * Mat4::from_rotation_z((side * v("roll")).to_radians())
             * Mat4::from_scale(Vec3::splat(v("scale") / 100.0));
     }
-    if ring::on("shield_status") && ring::shield_in(left) {
+    if ring::on("shield_status") && crate::options_ui::kyro_world::shield_in(left) {
         pose = match ring::value("shield_status", "position") {
             1 => pose * Mat4::from_translation(Vec3::new(0.0, -0.35, 0.0)),
             2 => pose * Mat4::from_translation(Vec3::new(side * 0.32, -0.12, 0.0)) * Mat4::from_rotation_y((side * -18.0_f32).to_radians()),

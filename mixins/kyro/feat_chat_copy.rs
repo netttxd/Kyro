@@ -9,7 +9,7 @@ fn kyro_feat_chat_copy(game: &mut crate::game::Game<'_>, event: &winit::event::W
         && ring::on("better_chat")
         && ring::value("better_chat", "copy") == 1
     {
-        let text = ring::chat_copy();
+        let text = horizon_client::options_ui::kyro_world::chat_copy();
         if !text.is_empty() {
             game.clipboard.set(&text);
         }

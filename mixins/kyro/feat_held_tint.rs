@@ -18,10 +18,10 @@ fn kyro_feat_held_tint(
     // shortcut: "own player" by position, as the cape does.
     let own = game.player.as_ref().is_some_and(|p| (p.position.x - mob.position.x).abs() < 0.5 && (p.position.z - mob.position.z).abs() < 0.5);
     NESTED.set(true);
-    let tint = if own { ring::own_shield_color() } else { ring::shield_color(crate::game::kyro_feat::shield_wait(mob.id)) };
-    ring::hold_shield_tint(Some(tint));
+    let tint = if own { horizon_client::options_ui::kyro_world::own_shield_color() } else { horizon_client::options_ui::kyro_world::shield_color(crate::game::kyro_feat::shield_wait(mob.id)) };
+    horizon_client::options_ui::kyro_world::hold_shield_tint(Some(tint));
     game.held_item_geometry(mob, camera, alpha, light, lit, out);
-    ring::hold_shield_tint(None);
+    horizon_client::options_ui::kyro_world::hold_shield_tint(None);
     NESTED.set(false);
     core::ops::ControlFlow::Break(())
 }

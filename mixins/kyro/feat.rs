@@ -49,8 +49,8 @@ pub fn zoom_key(playing: bool, pressed: bool, start: usize) {
 pub fn zoom_wheel(steps: f32) -> bool {
     use horizon_client::options_ui::kyro_ring as ring;
     if LOOK.get().is_some() && steps != 0.0 && horizon_client::options_ui::kyro_ring::value("freelook", "scroll") == 1 {
-        let share = ring::look_distance() * if steps > 0.0 { 0.85 } else { 1.0 / 0.85 };
-        ring::set_look_distance(share.clamp(0.35, 3.0));
+        let share = horizon_client::options_ui::kyro_world::look_distance() * if steps > 0.0 { 0.85 } else { 1.0 / 0.85 };
+        horizon_client::options_ui::kyro_world::set_look_distance(share.clamp(0.35, 3.0));
         return true;
     }
     let (held, level) = ZOOM.get();
@@ -78,7 +78,7 @@ pub fn zoom_view() -> Option<(f32, bool, f32)> {
     (next > 1.0).then(|| (next, false, 1.0 / next))
 }
 
-/// The freelook key: down keeps the camera's angles apart from the player's.
+// The freelook key: down keeps the camera's angles apart from the player's.
 thread_local! {
     static STEPPED_BACK: Cell<bool> = const { Cell::new(false) };
 }
@@ -134,7 +134,7 @@ pub fn look_key(playing: bool, pressed: bool, yaw: f32, pitch: f32) {
         LOOK.set(Some((yaw, pitch)));
     } else if !pressed {
         LOOK.set(None);
-        horizon_client::options_ui::kyro_ring::set_look_distance(1.0);
+        horizon_client::options_ui::kyro_world::set_look_distance(1.0);
     }
 }
 
@@ -162,7 +162,7 @@ thread_local! {
     static SPRINT: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Whether Sprint just turned on or off.
+// Whether Sprint just turned on or off.
 thread_local! {
     static SPRINT_TAPPED: Cell<bool> = const { Cell::new(false) };
 }
@@ -418,7 +418,7 @@ pub fn track_kills(game: &crate::game::Game<'_>) {
     if let Some((id, name, player, at)) = k.target.clone() {
         let mob = game.mobs.iter().find(|m| m.id == id && !m.removed);
         let died = DIED.swap(-1, std::sync::atomic::Ordering::Relaxed) == id as i32;
-        let gone = died || mob.map_or(horizon_client::options_ui::kyro_ring::server().is_empty(), |m| m.health <= 0.0);
+        let gone = died || mob.map_or(horizon_client::options_ui::kyro_world::server().is_empty(), |m| m.health <= 0.0);
         if now.duration_since(at).as_secs() >= 3 {
             k.target = None;
         } else if gone {

@@ -7,7 +7,7 @@ fn kyro_feat_chat(chat: &mut Chat, font: &crate::font::Font, message: &Message, 
         static LAST: RefCell<(String, u32)> = const { RefCell::new((String::new(), 0)) };
     }
     let plain = message.content.plain();
-    if NESTED.get() || ring::chat_restoring() || !ring::on("better_chat") || plain.trim().is_empty() {
+    if NESTED.get() || crate::options_ui::kyro_world::chat_restoring() || !ring::on("better_chat") || plain.trim().is_empty() {
         return core::ops::ControlFlow::Continue(());
     }
     let words = ring::text_value("better_chat", "text_filter");
@@ -28,9 +28,9 @@ fn kyro_feat_chat(chat: &mut Chat, font: &crate::font::Font, message: &Message, 
         chat.rewrap(font);
     }
     // Room for the sender's face, which the layout draws over these spaces.
-    let skin = ring::take_line_skin(&plain).filter(|_| ring::value("better_chat", "heads") == 1);
+    let skin = crate::options_ui::kyro_world::take_line_skin(&plain).filter(|_| ring::value("better_chat", "heads") == 1);
     let mut shown = Text::literal(if skin.is_some() { "   " } else { "" });
-    let own = ring::own_name();
+    let own = crate::options_ui::kyro_world::own_name();
     if ring::value("better_chat", "mentions") == 1 && !own.is_empty() && repeats == 1 && plain.to_lowercase().contains(&own.to_lowercase()) {
         shown = shown.append(Text::colored("\u{258c} ", 0xffaa00));
     }
@@ -42,7 +42,7 @@ fn kyro_feat_chat(chat: &mut Chat, font: &crate::font::Font, message: &Message, 
         shown = shown.append(Text::colored(format!(" (x{repeats})"), 0x8c8c8c));
     }
     if let Some(skin) = skin {
-        ring::remember_line(&shown.plain(), skin);
+        crate::options_ui::kyro_world::remember_line(&shown.plain(), skin);
     }
     let mut out = message.clone();
     out.content = shown;

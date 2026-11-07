@@ -21,7 +21,7 @@ fn kyro_feat_skin(m: &Mob, alpha: f32, base: glam::Mat4, atlas: Atlas, light: u3
     let s = anim::state(m, alpha);
     let mut poses = Poses::new(&model);
     anim::setup(m, &s, &mut poses, &data.animations);
-    ring::set_raised();
+    crate::options_ui::kyro_world::set_raised();
     let arm = if model_key.contains("slim") { 3.0 } else { 4.0 };
     let overlay = u32::from(red_overlay(m));
     let color = body_color(m, alpha);

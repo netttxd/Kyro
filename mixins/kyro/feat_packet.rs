@@ -6,7 +6,7 @@ fn kyro_feat_packet(game: &mut crate::game::Game<'_>, packet: &C) {
         C::Animate(p) if p.action == 4 => f::crit(p.id),
         C::SwingAnimation(p) => f::swing(p.id),
         C::Login(_) => f::session_reset(),
-        C::PlayerChat(p) => horizon_client::options_ui::kyro_ring::set_chat_sender(p.sender),
+        C::PlayerChat(p) => horizon_client::options_ui::kyro_world::set_chat_sender(p.sender),
         C::EntityEvent(p) if p.event == 3 => f::entity_died(p.id),
         // Complete Shield Fixes (MC-105068): shields sound when hit or disabled.
         C::EntityEvent(p) if p.event == 29 || p.event == 30 => {

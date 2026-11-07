@@ -49,7 +49,7 @@ fn kyro_feat_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
         f::zoom_key(playing, pressed, ring::value("zoom", "level") as usize);
     }
     if ring::on("freelook") && key == f::bound_key(game, "freelook") && (!pressed || ring::bind_ok("freelook", key, held)) {
-        let server = ring::server().to_lowercase();
+        let server = horizon_client::options_ui::kyro_world::server().to_lowercase();
         let blocked = !server.is_empty() && ring::text_value("freelook", "text_blocked").split(',').any(|b| !b.trim().is_empty() && server.contains(&b.trim().to_lowercase()));
         let allowed = !blocked && (ring::value("freelook", "solo") == 0 || server.is_empty());
         // As Java: from first person the camera steps back while held, so your body stays in view.
