@@ -12,9 +12,8 @@ fn kyro_feat_packet(game: &mut crate::game::Game<'_>, packet: &C) {
         C::EntityEvent(p) if p.event == 29 || p.event == 30 => {
             use horizon_client::options_ui::kyro_ring as ring;
             if p.event == 30 {
-                // u32::MAX stands for you: the mob list doesn't hold your own entity.
                 let own = game.remote.as_ref().is_some_and(|r| r.entity_id == p.id);
-                f::shield_broke(if own { u32::MAX } else { p.id as u32 });
+                f::shield_broke(if own { f::YOU } else { p.id as u32 });
             }
             let at = game.mobs.iter().find(|m| m.id == p.id as u32).map(|m| [m.position.x, m.position.y, m.position.z]).or_else(|| game.native_player().map(|o| [o.x, o.y, o.z]));
             if let Some(at) = at.filter(|_| ring::on("shield_status") && ring::value("shield_status", "sounds") == 1) {

@@ -2298,8 +2298,8 @@ fn big(batch: &mut HudBatch, atlas: &HudAtlas, value: &str, x: f32, y: f32, scal
 const CARD_W: f32 = 158.0;
 const CARD_H: f32 = 192.0;
 const CARD_GAP: f32 = 16.0;
-const CARDS: i32 = 6;
-const EMBLEMS: [&str; 6] = ["ui_hud", "ui_pvp", "ui_visual", "ui_client", "ui_capes", "ui_themes"];
+const CARDS: i32 = NAMES.len() as i32;
+const EMBLEMS: [&str; NAMES.len()] = ["ui_hud", "ui_pvp", "ui_visual", "ui_client", "ui_capes", "ui_themes"];
 static DECK: Mutex<(f32, Option<Instant>)> = Mutex::new((2.0, None));
 static SWIPE: Mutex<Option<(f32, f32)>> = Mutex::new(None);
 

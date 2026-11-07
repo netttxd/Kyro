@@ -356,6 +356,9 @@ pub fn shield_broke(id: u32) {
     }
 }
 
+/// The entity id that stands for you: the mob list doesn't hold your own entity.
+pub const YOU: u32 = u32::MAX;
+
 /// The share of that wait left for an entity; 0 when its shield is fine.
 pub fn shield_wait(id: u32) -> f32 {
     let Ok(mut broken) = BROKEN.lock() else {
@@ -593,7 +596,7 @@ struct Media {
 
 static MEDIA: std::sync::LazyLock<std::sync::Mutex<Media>> = std::sync::LazyLock::new(Default::default);
 static MEDIA_STARTED: std::sync::Once = std::sync::Once::new();
-const MEDIA_SCRIPT: &str = r#"param($parent, $mode)
+const MEDIA_SCRIPT: &str = r#"param($parent, $mode, $data)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -628,7 +631,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
             $names = ($all | ForEach-Object { $_.SourceAppUserModelId }) -join "`t"
             if ($names -ne $seen) { $seen = $names; [Console]::Out.WriteLine("S`t$names") }
         }
-        $off = @(((Get-Content 'horizon-mods\.horizon-mod-data\kyro\set_lyrics_text_apps_off' -Raw -ErrorAction SilentlyContinue) -split '\|') | Where-Object { $_ })
+        $off = @(((Get-Content (Join-Path $data 'set_lyrics_text_apps_off') -Raw -ErrorAction SilentlyContinue) -split '\|') | Where-Object { $_ })
         $open = @($all | Where-Object { $off -notcontains $_.SourceAppUserModelId })
         $live = @($open | Where-Object { $_.GetPlaybackInfo().PlaybackStatus -eq 'Playing' })
         if ($live.Count -gt 0) { $open = $live }
@@ -653,7 +656,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                 # Nothing found (a network blip, say): one more try half a minute later, as Java.
                 $retryAt = $null
                 $fresh = $key -ne $last
-                $online = (Get-Content 'horizon-mods\.horizon-mod-data\kyro\set_lyrics_online' -ErrorAction SilentlyContinue) -ne '0'
+                $online = (Get-Content (Join-Path $data 'set_lyrics_online') -ErrorAction SilentlyContinue) -ne '0'
                 $last = $key
                 $song, $singer = Tidy-Track $p.Title $p.Artist ($s.SourceAppUserModelId -notlike '*Spotify*')
                 [Console]::Out.WriteLine('C')
@@ -667,7 +670,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                             # Covers stay on disk, as Java's: a song played before asks nobody.
                             $md5 = [System.Security.Cryptography.MD5]::Create()
                             $name = -join ($md5.ComputeHash([Text.Encoding]::UTF8.GetBytes($key)) | ForEach-Object { $_.ToString('x2') })
-                            $folder = Join-Path (Get-Location).Path 'horizon-mods\.horizon-mod-data\kyro\covers'
+                            $folder = Join-Path $data 'covers'
                             $saved = Join-Path $folder "$name.png"
                             if (Test-Path $saved) {
                                 $sharp = [System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream(,[IO.File]::ReadAllBytes($saved))))
@@ -804,11 +807,13 @@ fn media_reader(mode: &str) -> std::io::Result<()> {
     use std::io::BufRead;
     let path = std::env::temp_dir().join(format!("kyro-media-{mode}.ps1"));
     std::fs::write(&path, MEDIA_SCRIPT)?;
+    let data = horizon_client::options_ui::kyro_ring::data_dir().unwrap_or_default();
+    let quoted = |p: &std::path::Path| p.display().to_string().replace('\'', "''");
     let mut command = std::process::Command::new("powershell.exe");
     command
         .args(["-NoProfile", "-NonInteractive", "-Command"])
         // Run as a script block: execution policy covers script files, so nothing has to bypass it.
-        .arg(format!("& ([scriptblock]::Create([IO.File]::ReadAllText('{}'))) {} {mode}", path.display().to_string().replace('\'', "''"), std::process::id()))
+        .arg(format!("& ([scriptblock]::Create([IO.File]::ReadAllText('{}'))) {} {mode} '{}'", quoted(&path), std::process::id(), quoted(&data)))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
     #[cfg(windows)]
@@ -1004,7 +1009,7 @@ pub fn session_seconds() -> u64 {
 static NUDGES: std::sync::Mutex<(Option<std::collections::HashMap<String, i64>>, Option<std::time::Instant>)> = std::sync::Mutex::new((None, None));
 
 fn nudge_file() -> Option<std::path::PathBuf> {
-    std::env::current_dir().ok().map(|d| d.join("horizon-mods").join(".horizon-mod-data").join("kyro").join("lyric_offsets.txt"))
+    horizon_client::options_ui::kyro_ring::data_dir().map(|d| d.join("lyric_offsets.txt"))
 }
 
 fn nudges_loaded(slot: &mut Option<std::collections::HashMap<String, i64>>) -> &mut std::collections::HashMap<String, i64> {

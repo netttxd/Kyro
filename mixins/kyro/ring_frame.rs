@@ -122,7 +122,7 @@ fn post(input: PostInput) -> vec4<f32> {
     crate::game::kyro_feat::track_kills(game);
     // Your shield: the server's cooldown, the local one, or the disable event, whichever is known.
     let shield = [game.offhand.as_ref(), game.held()].into_iter().flatten().find(|s| s.item.ends_with(":shield")).map(|s| s.item.to_string());
-    let wait = shield.map_or(0.0_f32, |item| game.cooldowns.percent(&item, 0.0)).max((game.shield_cooldown as f32 / 100.0).min(1.0)).max(crate::game::kyro_feat::shield_wait(u32::MAX));
+    let wait = shield.map_or(0.0_f32, |item| game.cooldowns.percent(&item, 0.0)).max((game.shield_cooldown as f32 / 100.0).min(1.0)).max(crate::game::kyro_feat::shield_wait(crate::game::kyro_feat::YOU));
     horizon_client::options_ui::kyro_world::set_shield_tint(horizon_client::options_ui::kyro_world::shield_color(wait));
     let held_shield = |s: Option<&crate::game::ItemStack>| s.is_some_and(|s| s.item.ends_with(":shield"));
     let (main, off) = (held_shield(game.held()), held_shield(game.offhand.as_ref()));
@@ -147,7 +147,7 @@ fn post(input: PostInput) -> vec4<f32> {
         thread_local! {
             static LOG: std::cell::Cell<(bool, u64, Option<std::time::Instant>)> = const { std::cell::Cell::new((false, 0, None)) };
         }
-        let file = || std::env::current_dir().ok().map(|d| d.join("horizon-mods").join(".horizon-mod-data").join("kyro").join("chat_log.txt"));
+        let file = || m::data_dir().map(|d| d.join("chat_log.txt"));
         let (restored, seen, at) = LOG.get();
         if !restored {
             let text = file().and_then(|f| std::fs::read_to_string(f).ok()).unwrap_or_default();

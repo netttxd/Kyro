@@ -116,6 +116,11 @@ static CHAT_QUERY: Mutex<String> = Mutex::new(String::new());
 
 static CHAT_FOCUS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// The chat's search box on a screen `width` wide: x, y, w, h.
+pub fn chat_search_box(width: f32) -> [f32; 4] {
+    [width - 134.0, 4.0, 130.0, 14.0]
+}
+
 pub fn chat_search_on() -> bool {
     on("better_chat") && value("better_chat", "search") == 1
 }
