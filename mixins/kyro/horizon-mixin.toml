@@ -5,7 +5,7 @@ priority = 100
 
 # Raw targets are exact functions of one Horizon commit. Pin it (generate --horizon-revision SHA):
 [compatibility]
-horizon_revision = "c9d474dd9116e84c243f8992d75c11314df56f06"
+horizon_revision = "6560641ba51a452f6bc2407baa4eb1b3be517ca8"
 
 [[module]]
 id = "shared"
@@ -306,7 +306,7 @@ bindings = [
 id = "feat-wavy"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::mobs::render::cape"
+target = "horizon_client_lib::mobs::render::cape"
 helper = "feat_wavy.rs"
 bindings = [
   { name = "m", ty = "&Mob", value = "m" },
@@ -489,7 +489,7 @@ bindings = [
 id = "feat-hitbox-draw"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::gizmos::Gizmos::entity_box"
+target = "horizon_client_lib::gizmos::Gizmos::entity_box"
 helper = "feat_hitbox_draw.rs"
 bindings = [
   { name = "gizmos", ty = "&mut Gizmos", value = "&mut *self" },
@@ -504,7 +504,7 @@ bindings = [
 [[injection]]
 id = "feat-skin"
 kind = "HEAD"
-target = "horizon_client::mobs::render::render_visible"
+target = "horizon_client_lib::mobs::render::render_visible"
 helper = "feat_skin.rs"
 bindings = [
   { name = "m", ty = "&Mob", value = "m" },
@@ -521,7 +521,7 @@ bindings = [
 id = "feat-skin-flat"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::mobs::anim::player_model_visibility"
+target = "horizon_client_lib::mobs::anim::player_model_visibility"
 helper = "feat_skin_flat.rs"
 bindings = [
   { name = "p", ty = "&mut Poses", value = "&mut *p" },
@@ -638,7 +638,7 @@ bindings = [
 id = "feat-shield-tint"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::item_render::special::submit"
+target = "horizon_client_lib::item_render::special::submit"
 helper = "feat_shield_tint.rs"
 bindings = [
   { name = "renderer", ty = "&ItemRenderer", value = "renderer" },
@@ -655,12 +655,11 @@ bindings = [
 id = "feat-titles"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::game::titles::Game<'_>::draw_titles"
+target = "horizon_client::game::titles::Game<'_>::draw_overlay_message"
 helper = "feat_titles.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
   { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
-  { name = "bar_height", ty = "i32", value = "bar_height" },
 ]
 
 [[injection]]
@@ -751,6 +750,7 @@ bindings = [
   { name = "alpha", ty = "f64", value = "alpha" },
   { name = "light", ty = "u32", value = "light" },
   { name = "lit", ty = "bool", value = "lit" },
+  { name = "skin", ty = "&mut Option<&mut super::creatures::Skinned>", value = "&mut skin" },
   { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
 ]
 
@@ -859,25 +859,10 @@ bindings = [
 ]
 
 [[injection]]
-id = "feat-shield-down"
-kind = "HEAD"
-cancellable = true
-target = "horizon_client::game::shield::Game<'_>::blocked_by_attacker"
-helper = "feat_shield_down.rs"
-bindings = [
-  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "component", ty = "&horizon_client::items::BlocksAttacks", value = "component" },
-  { name = "attacker", ty = "[f64; 2]", value = "attacker" },
-  { name = "fully", ty = "bool", value = "fully" },
-  { name = "disable", ty = "f32", value = "disable" },
-  { name = "at", ty = "Option<[f64; 3]>", value = "at" },
-]
-
-[[injection]]
 id = "feat-glint-uv"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::item_render::Glint::uv"
+target = "horizon_client_lib::item_render::Glint::uv"
 helper = "feat_glint_uv.rs"
 bindings = [
   { name = "this", ty = "&Glint", value = "self" },
@@ -901,7 +886,7 @@ bindings = [
 id = "feat-held"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::first_person::item_pose"
+target = "horizon_client_lib::first_person::item_pose"
 helper = "feat_held.rs"
 bindings = [
   { name = "left", ty = "bool", value = "left" },
@@ -913,7 +898,7 @@ bindings = [
 [[injection]]
 id = "feat-swing"
 kind = "RETURN"
-target = "horizon_client::first_person::swing_duration"
+target = "horizon_client_lib::first_person::swing_duration"
 helper = "feat_swing.rs"
 bindings = [
   { name = "value", ty = "i32", value = "$value" },

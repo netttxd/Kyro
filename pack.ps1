@@ -16,7 +16,7 @@ $manifest = [ordered]@{
     id      = $id
     version = $version
     game    = '26.3'
-    horizon = 'c9d474dd9116e84c243f8992d75c11314df56f06'
+    horizon = '6560641ba51a452f6bc2407baa4eb1b3be517ca8'
     mixins  = 'e8cd0aa38cffef49cb2e088ef716baa107148c02'
 } | ConvertTo-Json
 

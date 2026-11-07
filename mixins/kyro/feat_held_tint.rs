@@ -6,6 +6,7 @@ fn kyro_feat_held_tint(
     alpha: f64,
     light: u32,
     lit: bool,
+    skin: &mut Option<&mut super::creatures::Skinned>,
     out: &mut Vec<Vertex>,
 ) -> core::ops::ControlFlow<()> {
     use horizon_client::options_ui::kyro_ring as ring;
@@ -20,7 +21,7 @@ fn kyro_feat_held_tint(
     NESTED.set(true);
     let tint = if own { horizon_client::options_ui::kyro_world::own_shield_color() } else { horizon_client::options_ui::kyro_world::shield_color(crate::game::kyro_feat::shield_wait(mob.id)) };
     horizon_client::options_ui::kyro_world::hold_shield_tint(Some(tint));
-    game.held_item_geometry(mob, camera, alpha, light, lit, out);
+    game.held_item_geometry(mob, camera, alpha, light, lit, skin.as_deref_mut(), out);
     horizon_client::options_ui::kyro_world::hold_shield_tint(None);
     NESTED.set(false);
     core::ops::ControlFlow::Break(())

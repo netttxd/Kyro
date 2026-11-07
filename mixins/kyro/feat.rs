@@ -96,6 +96,28 @@ pub fn set_stepped_back(on: bool) -> bool {
 
 static RAISED: std::sync::Mutex<Vec<(u32, std::time::Instant)>> = std::sync::Mutex::new(Vec::new());
 
+/// A shield an axe disabled: Horizon's server keeps that to itself, so the client went on raising
+/// it. Once its cooldown starts, this sends what vanilla's does: the item cooldown, and entity
+/// event 30 for everyone near.
+pub fn shield_down(game: &mut crate::game::Game<'_>) {
+    thread_local! {
+        static LAST: std::cell::RefCell<(u32, Option<String>)> = const { std::cell::RefCell::new((0, None)) };
+    }
+    let held = game.using.and_then(|(slot, _)| game.stack_in(slot)).map(|s| s.item.to_string());
+    let (was, item) = LAST.with_borrow(|l| l.clone());
+    LAST.set((game.shield_cooldown, held.clone()));
+    let Some(item) = item.filter(|_| game.shield_cooldown > was && game.using.is_none()) else {
+        return;
+    };
+    game.add_cooldown(std::sync::Arc::from(item.as_str()), game.shield_cooldown as i32);
+    if let Some(spot) = game.player.as_ref().map(|p| [p.position.x, p.position.y, p.position.z]) {
+        // shortcut: a LAN host's own event isn't sent; this Horizon gives the host no entity id.
+        if game.lan_acting.is_some() {
+            game.guest_equipment_breaks.push((30, spot));
+        }
+    }
+}
+
 /// Complete Shield Fixes: a player's shield shows raised only after the 5 ticks it takes to block.
 pub fn shield_delay(game: &mut crate::game::Game<'_>) {
     use horizon_client::options_ui::kyro_ring as ring;

@@ -114,6 +114,7 @@ fn post(input: PostInput) -> vec4<f32> {
         horizon_client::options_ui::kyro_world::chat_closed();
     }
     crate::game::kyro_feat::shield_delay(game);
+    crate::game::kyro_feat::shield_down(game);
     crate::game::kyro_feat::track_kills(game);
     // Your shield: the server's cooldown, the local one, or the disable event, whichever is known.
     let shield = [game.offhand.as_ref(), game.held()].into_iter().flatten().find(|s| s.item.ends_with(":shield")).map(|s| s.item.to_string());

@@ -9,7 +9,7 @@ fn kyro_feat_tnt(game: &Game<'_>, mut value: Vec<NameTag>) -> Vec<NameTag> {
             static WATCHED: std::cell::Cell<Option<(u32, f32)>> = const { std::cell::Cell::new(None) };
             static POPS: RefCell<Vec<(glam::DVec3, String, Instant)>> = const { RefCell::new(Vec::new()) };
         }
-        if let Some((index, _)) = game.mob_hit() {
+        if let Some((index, _, _)) = game.mob_hit() {
             let m = &game.mobs[index];
             if let Some((id, health)) = WATCHED.get()
                 && id == m.id
@@ -31,6 +31,7 @@ fn kyro_feat_tnt(game: &Game<'_>, mut value: Vec<NameTag>) -> Vec<NameTag> {
                     lines: vec![(Text::colored(text.clone(), 0xffffff), 0.0)],
                     light: 15,
                     discrete: false,
+                    marks: Default::default(),
                 });
             }
         });
@@ -46,6 +47,7 @@ fn kyro_feat_tnt(game: &Game<'_>, mut value: Vec<NameTag>) -> Vec<NameTag> {
             lines: vec![(Text::colored(format!("{seconds:.1}"), color), 0.0)],
             light: game.world.light(t.position.x.floor() as i32, t.position.y.floor() as i32, t.position.z.floor() as i32),
             discrete: false,
+            marks: Default::default(),
         });
     }
     value

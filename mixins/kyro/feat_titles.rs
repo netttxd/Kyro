@@ -1,5 +1,5 @@
 // The Action bar element: the game's overlay message, moved and scaled where the editor put it.
-fn kyro_feat_titles(game: &crate::game::Game<'_>, batch: &mut HudBatch, bar_height: i32) -> core::ops::ControlFlow<()> {
+fn kyro_feat_titles(game: &crate::game::Game<'_>, batch: &mut HudBatch) -> core::ops::ControlFlow<()> {
     use horizon_client::options_ui::kyro_ring as ring;
     let (w, h) = (batch.width as i32, batch.height as i32);
     let partial = game.clock.fraction() as f32;
@@ -10,7 +10,7 @@ fn kyro_feat_titles(game: &crate::game::Game<'_>, batch: &mut HudBatch, bar_heig
     batch.fill(atlas, 0.0, 0.0, 0.0, 0.0, 0);
     let start = batch.vertices.len();
     if ring::on("action_bar") {
-        let draws = game.titles.overlay_message(w, h, bar_height, partial, &atlas.font, background);
+        let draws = game.titles.overlay_message(w, h, partial, &atlas.font, background);
         hud_layout::paint(batch, atlas, &draws);
     }
     if batch.vertices.len() > start {
@@ -34,7 +34,5 @@ fn kyro_feat_titles(game: &crate::game::Game<'_>, batch: &mut HudBatch, bar_heig
         // Nothing to show: the editor still gets a box to drag.
         ring::place("action_bar", 182.0, 12.0, (((batch.width - 182.0) / 2.0).floor(), batch.height - 72.0));
     }
-    let draws = game.titles.title(w, h, partial, &atlas.font, background);
-    hud_layout::paint(batch, atlas, &draws);
     core::ops::ControlFlow::Break(())
 }

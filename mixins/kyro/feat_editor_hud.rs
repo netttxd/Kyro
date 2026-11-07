@@ -4,7 +4,8 @@ fn kyro_feat_editor_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_cl
         let mut corners = horizon_client::extras_hud::Corners::new(batch.width, batch.height, 0.0);
         game.native_hud(batch, &mut corners);
         game.draw_scoreboard(batch);
-        game.draw_titles(batch, 39);
+        game.draw_overlay_message(batch);
+        game.draw_title(batch);
         // The hotbar too, so the screen looks as it does in play.
         let (x, y) = ((batch.width / 2.0).floor() - 91.0, batch.height - 22.0);
         batch.sprite_scaled(&game.gui.atlas, "gui/sprites/hud/hotbar", x, y, 182.0, 22.0, u32::MAX);

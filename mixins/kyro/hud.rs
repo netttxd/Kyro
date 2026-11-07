@@ -366,7 +366,7 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             rows.push(("light", "Light".to_owned(), block.to_string()));
         }
         if ring::on("reach") {
-            if crate::game::kyro_feat::since_hit() < 0.1 && let Some((_, distance)) = game.mob_hit() {
+            if crate::game::kyro_feat::since_hit() < 0.1 && let Some((_, distance, _)) = game.mob_hit() {
                 crate::game::kyro_feat::set_reach(distance);
             }
             rows.push(("reach", "Reach".to_owned(), crate::game::kyro_feat::reach().map_or("--".to_owned(), |r| format!("{r:.2}"))));
