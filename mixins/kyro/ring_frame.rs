@@ -225,17 +225,22 @@ fn post(input: PostInput) -> vec4<f32> {
             renderer.drop_shader_packs();
         }
     }
-    // Glint and hit colors live in loaded resources: reload once the menu closes.
-    static RELOAD: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
     for (key, value) in m::take_saved() {
-        if key.contains("glint_color") {
-            RELOAD.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
         game.native_set_setting(p::ID, &key, &value);
+    }
+    // The glint's look lives in loaded resources, so it needs a reload, but only when it really
+    // changed: Speed and Strength apply live, and a color put back needs nothing.
+    static GLINT: std::sync::Mutex<Option<[i32; 5]>> = std::sync::Mutex::new(None);
+    let glint = [i32::from(m::on("glint_color")), m::value("glint_color", "color"), m::value("glint_color", "glint_style"), m::value("glint_color", "armor"), m::value("glint_color", "armor_color")];
+    if !m::by_key() {
+        // What the game loaded with, before any menu changes it.
+        if let Ok(mut loaded) = GLINT.lock() {
+            loaded.get_or_insert(glint);
+        }
     }
     if game.screen != crate::game::Screen::Options && m::by_key() {
         m::closed();
-        if RELOAD.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        if GLINT.lock().is_ok_and(|mut loaded| loaded.replace(glint).is_some_and(|before| before != glint)) {
             game.reload_packs();
         }
         if game.screen == crate::game::Screen::Playing {
