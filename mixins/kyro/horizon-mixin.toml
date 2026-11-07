@@ -8,6 +8,13 @@ priority = 100
 horizon_revision = "c9d474dd9116e84c243f8992d75c11314df56f06"
 
 [[module]]
+id = "shared"
+file = "crates/horizon-core/src/lib.rs"
+name = "kyro_shared"
+source = "shared.rs"
+visibility = "pub"
+
+[[module]]
 id = "runtime"
 file = "crates/horizon-client/src/game.rs"
 name = "port_kyro"
@@ -39,9 +46,7 @@ kind = "HEAD"
 target = "horizon_client::game::glowing::team_color"
 cancellable = true
 helper = "entity-glow-mixin-glow-color.rs"
-bindings = [
-  { name = "team", ty = "&Option<&sb::Team>", value = "&team" },
-]
+bindings = []
 
 [[injection]]
 id = "game-renderer-mixin-hurt-cam"
@@ -64,7 +69,6 @@ cancellable = true
 helper = "item-stack-foil-mixin-shine.rs"
 bindings = [
   { name = "this", ty = "&ItemStack", value = "&*self" },
-  { name = "item_glint", ty = "bool", value = "item_glint" },
 ]
 
 [[injection]]
@@ -74,10 +78,7 @@ target = "horizon_client_render::particles::ParticleEngine::create"
 cancellable = true
 helper = "particle-engine-mixin-skip.rs"
 bindings = [
-  { name = "this", ty = "&mut ParticleEngine", value = "&mut *self" },
   { name = "options", ty = "&ParticleOptions", value = "options" },
-  { name = "p", ty = "&[f64; 3]", value = "&p" },
-  { name = "v", ty = "&[f64; 3]", value = "&v" },
 ]
 
 [[module]]

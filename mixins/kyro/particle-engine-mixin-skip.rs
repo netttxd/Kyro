@@ -13,8 +13,7 @@
 // |       callback.setReturnValue(null);
 // |    }
 // | }
-fn kyro_skip(this: &mut ParticleEngine, options: &ParticleOptions, p: &[f64; 3], v: &[f64; 3]) -> std::ops::ControlFlow<()> {
-    let _ = (&this, &options, &p, &v);
+fn kyro_skip(options: &ParticleOptions) -> std::ops::ControlFlow<()> {
     use crate::options_ui::kyro_ring as ring;
     if !ring::on("particles") {
         return std::ops::ControlFlow::Continue(());

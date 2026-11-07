@@ -5,7 +5,7 @@ fn kyro_feat_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
     if !game.native_on(p::ID) {
         return;
     }
-    let held = i32::from(game.modifiers.shift_key()) | i32::from(game.modifiers.control_key()) << 1 | i32::from(game.modifiers.alt_key()) << 2;
+    let held = f::held_modifiers(game);
     if let Some(name) = ring::listening() {
         let modifier = ring::is_modifier(key);
         // Shift or AltGr may be on the way to a symbol, so only a modifier let go alone binds it.
@@ -29,12 +29,7 @@ fn kyro_feat_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
             Some((key, held))
         };
         if let Some((key, modifiers)) = picked {
-            game.settings.mods.keys.entry(p::ID.to_owned()).or_default().insert(name.to_owned(), key.to_owned());
-            // The save must hold your own menu blur, not Glass's stand-in.
-            let shown = game.settings.menu_blur;
-            game.settings.menu_blur = ring::own_blur().unwrap_or(shown);
-            game.settings.save(&crate::game::Game::options_path());
-            game.settings.menu_blur = shown;
+            f::save_key(game, name, key);
             ring::finish_bind(name, key, modifiers);
         }
         return;
@@ -44,16 +39,16 @@ fn kyro_feat_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
         f::sprint_tap();
     }
     if pressed && playing && ring::on("lyrics") {
-        if key == game.native_mod_key(p::ID, "lyric_earlier", "key.keyboard.left.bracket") && ring::bind_ok("lyric_earlier", key, held) {
+        if key == f::bound_key(game, "lyric_earlier") && ring::bind_ok("lyric_earlier", key, held) {
             f::nudge(50);
-        } else if key == game.native_mod_key(p::ID, "lyric_later", "key.keyboard.right.bracket") && ring::bind_ok("lyric_later", key, held) {
+        } else if key == f::bound_key(game, "lyric_later") && ring::bind_ok("lyric_later", key, held) {
             f::nudge(-50);
         }
     }
-    if ring::on("zoom") && key == game.native_mod_key(p::ID, "zoom", "key.keyboard.c") && (!pressed || ring::bind_ok("zoom", key, held)) {
+    if ring::on("zoom") && key == f::bound_key(game, "zoom") && (!pressed || ring::bind_ok("zoom", key, held)) {
         f::zoom_key(playing, pressed, ring::value("zoom", "level") as usize);
     }
-    if ring::on("freelook") && key == game.native_mod_key(p::ID, "freelook", "key.keyboard.left.alt") && (!pressed || ring::bind_ok("freelook", key, held)) {
+    if ring::on("freelook") && key == f::bound_key(game, "freelook") && (!pressed || ring::bind_ok("freelook", key, held)) {
         let server = ring::server().to_lowercase();
         let blocked = !server.is_empty() && ring::text_value("freelook", "text_blocked").split(',').any(|b| !b.trim().is_empty() && server.contains(&b.trim().to_lowercase()));
         let allowed = !blocked && (ring::value("freelook", "solo") == 0 || server.is_empty());

@@ -14,6 +14,28 @@ thread_local! {
     static NESTED: Cell<bool> = const { Cell::new(false) };
 }
 
+/// The key bound to one of the ring's KEYS, or its default.
+pub fn bound_key(game: &crate::game::Game<'_>, name: &str) -> String {
+    use horizon_client::options_ui::kyro_ring as ring;
+    let default = ring::KEYS.iter().find(|k| k[0] == name).map_or("key.keyboard.unknown", |k| k[2]);
+    game.native_mod_key(crate::game::port_kyro::ID, name, default)
+}
+
+/// Shift, Ctrl and Alt held now, as the ring's bind masks keep them.
+pub fn held_modifiers(game: &crate::game::Game<'_>) -> i32 {
+    i32::from(game.modifiers.shift_key()) | i32::from(game.modifiers.control_key()) << 1 | i32::from(game.modifiers.alt_key()) << 2
+}
+
+/// Binds one of Kyro's keys and saves the options.
+pub fn save_key(game: &mut crate::game::Game<'_>, name: &str, key: &str) {
+    game.settings.mods.keys.entry(crate::game::port_kyro::ID.to_owned()).or_default().insert(name.to_owned(), key.to_owned());
+    // The save must hold your own menu blur, not Glass's stand-in.
+    let shown = game.settings.menu_blur;
+    game.settings.menu_blur = horizon_client::options_ui::kyro_ring::own_blur().unwrap_or(shown);
+    game.settings.save(&crate::game::Game::options_path());
+    game.settings.menu_blur = shown;
+}
+
 pub fn zoom_key(playing: bool, pressed: bool, start: usize) {
     let (held, level) = ZOOM.get();
     if pressed && playing && !held {
@@ -451,7 +473,7 @@ pub fn draw_feed(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::
             game.draw_item_model(batch, weapon, x + 6.0, row - 1.0);
             batch.scale_since(start, x + 6.0, row - 1.0, 0.75, 0.75);
         }
-        let ink = if entry.death { 0xff8d8d } else { ring::panel_text(panel, 0, if entry.player { 0xedf3f4 } else { 0xb9c3ca }) };
+        let ink = if entry.death { 0xff8d8d } else { if entry.player { 0xedf3f4 } else { 0xb9c3ca } };
         lyric_text(game, batch, &entry.name, (x + 22.0, row + 3.0), 1.0, ink, alpha, true);
         if entry.streak > 1 {
             let shown = format!("x{}", entry.streak);
@@ -1063,14 +1085,6 @@ struct Shown {
 
 static SHOWN: std::sync::Mutex<Option<Shown>> = std::sync::Mutex::new(None);
 
-pub fn mix(a: u32, b: u32, t: f32) -> u32 {
-    let at = |shift: u32| {
-        let (x, y) = (((a >> shift) & 255) as f32, ((b >> shift) & 255) as f32);
-        ((x + (y - x) * t) as u32) << shift
-    };
-    at(16) | at(8) | at(0)
-}
-
 /// Text in a color and alpha at (x, y), grown by `scale` from that corner.
 pub fn lyric_text(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch, text: &str, at: (f32, f32), scale: f32, color: u32, alpha: f32, shadow: bool) {
     let start = batch.vertices.len();
@@ -1125,7 +1139,7 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
     // With nothing playing the box is just its one line.
     let (w, h) = if m.title.is_empty() { (game.native_text_width("Nothing playing") + 2.0 * PAD + 4.0, 8.0 + 2.0 * PAD) } else { (W, H) };
     let (x, y, zoom, panel) = ring::place("lyrics", w, h, (((batch.width - W) / 2.0).floor(), ((batch.height - H) * 0.76).floor()));
-    let (ink, muted) = (ring::panel_text(panel, 0, 0xffffff), ring::panel_text(panel, 0, 0xa8b0b8));
+    let (ink, muted) = (0xffffff, 0xa8b0b8);
     let first = batch.vertices.len();
     if panel {
         game.native_fill(batch, [x, y, w, h], ring::hud_panel());
@@ -1327,9 +1341,9 @@ pub fn draw_lyrics(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud
         } else if !sung {
             muted
         } else if current {
-            mix(ink, accent, 0.55 + 0.45 * pop)
+            horizon_client::options_ui::kyro_ring::mix(ink, accent, 0.55 + 0.45 * pop)
         } else {
-            mix(accent, ink, pop)
+            horizon_client::options_ui::kyro_ring::mix(accent, ink, pop)
         };
         let alpha = enter * if sung { 1.0 } else { 0.6 };
         let middle = word.x + word.w / 2.0;

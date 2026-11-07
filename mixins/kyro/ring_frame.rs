@@ -96,6 +96,7 @@ fn post(input: PostInput) -> vec4<f32> {
         m::load(|k| game.native_setting(p::ID, k));
     }
     game.settings.extras.own_name_tag = m::on("own_nametag");
+    horizon_core::kyro_shared::SHINY_POTIONS.store(m::on("shiny_potions"), std::sync::atomic::Ordering::Relaxed);
     m::set_own_name(game.own_profile_name());
     // Glass uses the game's own menu blur, at its slider, and gives the option back on close.
     if let Some(blur) = m::glass_blur() {
@@ -107,14 +108,12 @@ fn post(input: PostInput) -> vec4<f32> {
         game.settings.menu_blur = own;
         m::set_own_blur(None);
     }
-    m::set_held(i32::from(game.modifiers.shift_key()) | i32::from(game.modifiers.control_key()) << 1 | i32::from(game.modifiers.alt_key()) << 2);
+    m::set_held(crate::game::kyro_feat::held_modifiers(game));
     if game.screen == crate::game::Screen::Options {
-        m::set_menu_key(&game.native_mod_key(p::ID, "menu", "key.keyboard.right.shift"));
-        m::set_key_name("menu", &game.native_mod_key(crate::game::port_kyro::ID, "menu", "key.keyboard.right.shift"));
-        m::set_key_name("lyric_earlier", &game.native_mod_key(crate::game::port_kyro::ID, "lyric_earlier", "key.keyboard.left.bracket"));
-        m::set_key_name("lyric_later", &game.native_mod_key(crate::game::port_kyro::ID, "lyric_later", "key.keyboard.right.bracket"));
-        m::set_key_name("zoom", &game.native_mod_key(crate::game::port_kyro::ID, "zoom", "key.keyboard.c"));
-        m::set_key_name("freelook", &game.native_mod_key(crate::game::port_kyro::ID, "freelook", "key.keyboard.left.alt"));
+        m::set_menu_key(&crate::game::kyro_feat::bound_key(game, "menu"));
+        for [name, _, _] in m::KEYS {
+            m::set_key_name(name, &crate::game::kyro_feat::bound_key(game, name));
+        }
     }
     if game.screen != crate::game::Screen::Chat {
         m::chat_closed();
@@ -191,12 +190,7 @@ fn post(input: PostInput) -> vec4<f32> {
         crate::game::kyro_feat::session_reset();
     }
     if let Some((name, key)) = m::take_picked() {
-        game.settings.mods.keys.entry(p::ID.to_owned()).or_default().insert(name.to_owned(), key.to_owned());
-        // The save must hold your own menu blur, not Glass's stand-in.
-        let shown = game.settings.menu_blur;
-        game.settings.menu_blur = m::own_blur().unwrap_or(shown);
-        game.settings.save(&crate::game::Game::options_path());
-        game.settings.menu_blur = shown;
+        crate::game::kyro_feat::save_key(game, name, key);
     }
     if m::take_close() {
         m::reset_list();

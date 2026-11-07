@@ -1,17 +1,6 @@
 // Shiny potions: the shimmer the item renderer draws, from its own check.
 fn kyro_feat_foil(this: &Resolve<'_>) -> std::ops::ControlFlow<bool> {
-    // This crate cannot see the ring, so the saved switch is reread once a second.
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
-    static ON: AtomicBool = AtomicBool::new(false);
-    static READ_AT: AtomicU64 = AtomicU64::new(0);
-    let second = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |t| t.as_secs());
-    if READ_AT.swap(second, Relaxed) != second {
-        let file = std::env::current_dir().ok().map(|d| d.join("horizon-mods").join(".horizon-mod-data").join("kyro").join("on_shiny_potions"));
-        ON.store(file.and_then(|f| std::fs::read_to_string(f).ok()).is_some_and(|v| v.trim() == "true"), Relaxed);
-    }
-    let on = ON.load(Relaxed);
-    let name: &str = &this.stack.item;
-    if on && matches!(name, "minecraft:potion" | "minecraft:splash_potion" | "minecraft:lingering_potion") {
+    if horizon_core::kyro_shared::shines(&this.stack.item) {
         return std::ops::ControlFlow::Break(true);
     }
     std::ops::ControlFlow::Continue(())

@@ -1,5 +1,5 @@
 // The Right Shift menu: cards you swipe through, then each category's rows and settings.
-// It takes over Options > Mods while open, as Mod Menu does. Art is drawn from
+// It takes over Options > Mods while open, as Mod Menu does.
 // Themes color all of it through the palette below.
 
 use std::collections::HashMap;
@@ -13,6 +13,15 @@ use crate::text::Text;
 const NAMES: [&str; 6] = ["HUD", "PVP", "VISUAL", "CLIENT", "CAPE", "THEMES"];
 const HEADER: f32 = 24.0;
 const ROW: f32 = 18.0;
+
+/// Kyro's keys, for Options > Mods and the menu's Key rows: name, label, default key.
+pub const KEYS: [[&str; 3]; 5] = [
+    ["menu", "Open the Kyro menu", "key.keyboard.right.shift"],
+    ["zoom", "Zoom (hold)", "key.keyboard.c"],
+    ["freelook", "Freelook (hold)", "key.keyboard.left.alt"],
+    ["lyric_earlier", "Lyrics earlier", "key.keyboard.left.bracket"],
+    ["lyric_later", "Lyrics later", "key.keyboard.right.bracket"],
+];
 
 /// Mods by category: id, name, and whether it works in Rust yet.
 const MODS: [&[(&str, &str, bool)]; 6] = [
@@ -142,7 +151,7 @@ fn draw_picker(batch: &mut HudBatch, atlas: &HudAtlas) {
     };
     let [x, y, w, ph] = picker_rect((batch.width, batch.height), id);
     frame(batch, atlas, x, y, w, ph);
-    let ink = |c: u32| rgba((c >> 16) as u8, (c >> 8) as u8, c as u8, 255);
+    let ink = |c: u32| vertex_color(c, 255);
     for col in 0..30 {
         for row in 0..20 {
             let c = hsv(h, col as f32 / 29.0, 1.0 - row as f32 / 19.0);
@@ -183,7 +192,7 @@ fn picker_input(cursor: (f32, f32), size: (f32, f32), dragging: bool) -> bool {
     true
 }
 
-pub const COLORS: [u32; 8] = [0xffffff, 0xff5555, 0xffaa00, 0xffff55, 0x55ff55, 0x55ffff, 0x5555ff, 0xff55ff];
+const COLORS: [u32; 8] = [0xffffff, 0xff5555, 0xffaa00, 0xffff55, 0x55ff55, 0x55ffff, 0x5555ff, 0xff55ff];
 const SETTINGS_W: f32 = 270.0;
 
 
@@ -234,6 +243,24 @@ pub fn loaded() -> bool {
     with(|s| s.loaded)
 }
 
+/// Kyro's saved settings: one file per key, as the game's `native_setting` keeps them.
+pub fn data_dir() -> Option<std::path::PathBuf> {
+    std::env::current_dir().ok().map(|d| d.join("horizon-mods").join(".horizon-mod-data").join("kyro"))
+}
+
+/// Loads the saved settings from disk, for hooks that can run before the first frame does.
+pub fn ensure_loaded() {
+    if !loaded() {
+        let dir = data_dir();
+        load(|key| std::fs::read_to_string(dir.as_ref()?.join(key)).ok().map(|v| v.trim().to_owned()));
+    }
+}
+
+/// A color's red, green and blue.
+pub fn rgb(color: u32) -> [u32; 3] {
+    [(color >> 16) & 255, (color >> 8) & 255, color & 255]
+}
+
 /// Reads the saved switches once.
 pub fn load(get: impl Fn(&str) -> Option<String>) {
     with(|s| {
@@ -242,10 +269,6 @@ pub fn load(get: impl Fn(&str) -> Option<String>) {
                 if let Some(value) = get(&format!("on_{id}")) {
                     s.on.insert((*id).to_owned(), value == "true");
                 }
-            }
-        }
-        for mods in MODS {
-            for (id, _, _) in mods {
                 for (key, _, _, _, _) in settings_of(id) {
                     if let Some(value) = get(&format!("set_{id}_{key}")).and_then(|v| v.parse().ok()) {
                         s.values.entry((*id).to_owned()).or_default().insert((*key).to_owned(), value);
@@ -253,8 +276,8 @@ pub fn load(get: impl Fn(&str) -> Option<String>) {
                 }
             }
         }
-        let extra = (0..15).map(|n| ("crosshair".to_owned(), format!("r{n}"))).chain(["zoom", "freelook", "menu", "lyric_earlier", "lyric_later"].iter().flat_map(|k| [("keys".to_owned(), format!("{k}_mods")), ("keys".to_owned(), format!("{k}_for"))])).chain(
-            ELEMENTS.iter().flat_map(|e| ["x", "y", "s", "b", "p", "ax", "ay"].map(|k| ("hud".to_owned(), format!("{}_{k}", e.0)))),
+        let extra = (0..15).map(|n| ("crosshair".to_owned(), format!("r{n}"))).chain(KEYS.iter().flat_map(|[k, _, _]| [("keys".to_owned(), format!("{k}_mods")), ("keys".to_owned(), format!("{k}_for"))])).chain(
+            ELEMENTS.iter().flat_map(|e| SAVED_KEYS.map(|k| ("hud".to_owned(), format!("{}_{k}", e.0)))),
         );
         for (id, key) in extra {
             if let Some(value) = get(&format!("set_{id}_{key}")).and_then(|v| v.parse().ok()) {
@@ -356,7 +379,7 @@ pub fn back() -> bool {
 
 
 
-/// The pixel rounded corner used everywhere: two steps cut from each corner.
+/// A flat box, the shape every row, swatch and switch is drawn with.
 fn notched(batch: &mut HudBatch, atlas: &HudAtlas, x: f32, y: f32, w: f32, h: f32, color: u32) {
     batch.fill(atlas, x, y, w, h, color);
 }
@@ -1328,15 +1351,13 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
             for (i, color) in COLORS.iter().enumerate() {
                 let bx = right - 80.0 + i as f32 * 10.0;
                 notched(batch, atlas, bx - 1.0, ry, 10.0, 11.0, if i as i32 == current { white } else { line() });
-                let [r, g, b] = [(color >> 16) as u8, (color >> 8) as u8, *color as u8];
-                notched(batch, atlas, bx, ry + 1.0, 8.0, 9.0, rgba(r, g, b, 255));
+                notched(batch, atlas, bx, ry + 1.0, 8.0, 9.0, vertex_color(*color, 255));
             }
             // The custom swatch shows the picked color, or a rainbow until there is one.
             let bx = right - 90.0;
             notched(batch, atlas, bx - 1.0, ry, 10.0, 11.0, if current >= CUSTOM { white } else { line() });
             if current >= CUSTOM {
-                let c = color_of(current);
-                notched(batch, atlas, bx, ry + 1.0, 8.0, 9.0, rgba((c >> 16) as u8, (c >> 8) as u8, c as u8, 255));
+                notched(batch, atlas, bx, ry + 1.0, 8.0, 9.0, vertex_color(color_of(current), 255));
             } else {
                 notched(batch, atlas, bx, ry + 1.0, 8.0, 9.0, sunk());
                 batch.fill(atlas, bx + 1.5, ry + 5.0, 5.0, 1.0, white);
@@ -1707,7 +1728,7 @@ pub fn set_menu_key(key: &str) {
 static KEY_NAMES: Mutex<Vec<(&'static str, String)>> = Mutex::new(Vec::new());
 
 /// The mod key waiting for its next press, cleared by reading it.
-pub fn take_listening() -> Option<&'static str> {
+fn take_listening() -> Option<&'static str> {
     LISTENING.lock().ok()?.take()
 }
 
@@ -1901,9 +1922,14 @@ pub fn shield_color(wait: f32) -> u32 {
     if value("shield_status", "fade") != 1 {
         return off;
     }
+    mix(ready, off, wait)
+}
+
+/// The RGB color `t` of the way from `a` to `b`.
+pub fn mix(a: u32, b: u32, t: f32) -> u32 {
     let at = |shift: u32| {
-        let (a, b) = (((ready >> shift) & 255) as f32, ((off >> shift) & 255) as f32);
-        ((a + (b - a) * wait) as u32) << shift
+        let (x, y) = (((a >> shift) & 255) as f32, ((b >> shift) & 255) as f32);
+        ((x + (y - x) * t) as u32) << shift
     };
     at(16) | at(8) | at(0)
 }
@@ -2068,7 +2094,7 @@ pub fn set_players(players: Vec<(String, String, u128, String)>) {
 }
 
 /// The skin of the player whose name a chat line opens with; timestamps and brackets are skipped.
-pub fn sender_skin(line: &str) -> Option<String> {
+fn sender_skin(line: &str) -> Option<String> {
     let players = PLAYERS.lock().ok()?;
     // The sender comes before the colon or arrow, after any rank; a server's nickname is matched too.
     let opening = line.split([':', '\u{bb}', '>', '\u{2192}']).next().unwrap_or(line);
@@ -2121,11 +2147,7 @@ pub fn own_name() -> String {
 
 /// The picked cape color as a vertex color, if any.
 pub fn cape_tint() -> Option<u32> {
-    on("tint_capes").then(|| {
-        let index = value("tint_capes", "tint_color");
-        let color = if index >= CUSTOM { color_of(index) } else { COLORS[index.clamp(0, 7) as usize] };
-        rgba((color >> 16) as u8, (color >> 8) as u8, color as u8, 255)
-    })
+    on("tint_capes").then(|| vertex_color(color_of(value("tint_capes", "tint_color")), 255))
 }
 
 /// The cape you wear, by id.
@@ -2205,10 +2227,9 @@ fn refresh_palette() {
     if on("theme_colors") {
         for (slot, key) in COLOR_KEYS.iter().enumerate() {
             let v = value("theme_colors", key);
-            if v >= CUSTOM {
+            // -1 keeps the theme's own color.
+            if v >= 0 {
                 colors[slot] = color_of(v);
-            } else if (0..8).contains(&v) {
-                colors[slot] = COLORS[v as usize];
             }
         }
     }
@@ -2223,7 +2244,11 @@ fn tok(slot: usize) -> u32 {
 }
 
 fn ca(slot: usize, alpha: u8) -> u32 {
-    let c = tok(slot);
+    vertex_color(tok(slot), alpha)
+}
+
+/// An RGB color as a vertex color.
+pub fn vertex_color(c: u32, alpha: u8) -> u32 {
     rgba((c >> 16) as u8, (c >> 8) as u8, c as u8, alpha)
 }
 
@@ -2245,16 +2270,19 @@ fn panel() -> u32 {
     ca(1, if l == GLASS { 150 } else if l >= FIRST_ANIMATED { 226 } else { 255 })
 }
 
+/// How opaque HUD element backgrounds are.
+const PANEL_ALPHA: u8 = 0xd8;
+
 /// An element's background: the theme's panel color, as 0xAARRGGBB.
 pub fn hud_panel() -> u32 {
-    0xd800_0000 | tok(1)
+    u32::from(PANEL_ALPHA) << 24 | tok(1)
 }
 
 /// For elements the game draws itself: paints the six vertices held back under them as the
 /// theme's panel, and turns their white text to the theme's text.
 pub fn back_panel(vertices: &mut [crate::hud::HudVertex], [x, y, w, h]: [f32; 4]) {
     let (c, text) = (tok(1), tok(3));
-    let color = rgba((c >> 16) as u8, (c >> 8) as u8, c as u8, 216);
+    let color = vertex_color(c, PANEL_ALPHA);
     let corners = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
     for (v, i) in vertices.iter_mut().zip([0, 1, 2, 0, 2, 3]) {
         v.pos = corners[i];
@@ -2262,19 +2290,19 @@ pub fn back_panel(vertices: &mut [crate::hud::HudVertex], [x, y, w, h]: [f32; 4]
     }
     for v in vertices.iter_mut().skip(6) {
         if v.color & 0x00ff_ffff == 0x00ff_ffff {
-            v.color = v.color & 0xff00_0000 | rgba((text >> 16) as u8, (text >> 8) as u8, text as u8, 0);
+            v.color = v.color & 0xff00_0000 | vertex_color(text, 0);
         }
     }
 }
 
 /// Default text on a background takes the theme's text color; a color you picked stays.
-pub fn panel_text(panel: bool, chosen: i32, plain: u32) -> u32 {
-    if panel && chosen < 0 { tok(3) } else { plain }
+pub fn panel_text(panel: bool, chosen: i32, default: u32) -> u32 {
+    if chosen >= 0 { color_of(chosen) } else if panel { tok(3) } else { default }
 }
 
 /// Default values on a background take the theme's accent; a color you picked stays.
-pub fn panel_value(panel: bool, chosen: i32, plain: u32) -> u32 {
-    if panel && chosen < 0 { tok(7) } else { plain }
+pub fn panel_value(panel: bool, chosen: i32, default: u32) -> u32 {
+    if chosen >= 0 { color_of(chosen) } else if panel { tok(7) } else { default }
 }
 
 /// Blur for the frame hook while Glass is open.

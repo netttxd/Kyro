@@ -5,6 +5,6 @@ fn kyro_listed(mods: &mut Vec<crate::game::native_hooks::NativeMod>) {
         id: m::ID.into(),
         title: format!("{} {}", m::NAME, m::VERSION),
         description: m::DESCRIPTION.into(),
-        keys: m::KEYS.iter().map(|[n, l, d]| [n.to_string(), l.to_string(), d.to_string()]).collect(),
+        keys: horizon_client::options_ui::kyro_ring::KEYS.iter().map(|[n, l, d]| [n.to_string(), l.to_string(), d.to_string()]).collect(),
     });
 }
