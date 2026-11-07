@@ -34,6 +34,11 @@ const MODS: [&[(&str, &str, bool)]; 6] = [
     &[("#", "Themes", true), ("theme_classic", "Classic", true), ("theme_obsidian", "Obsidian", true), ("theme_crimson", "Crimson", true), ("theme_frost", "Frost", true), ("theme_sakura", "Sakura", true), ("theme_glass", "Glass", true), ("#", "Animated", true), ("theme_nebula", "Nebula", true), ("theme_ember", "Ember", true), ("theme_aurora", "Aurora", true), ("theme_petals", "Petals", true), ("theme_signal", "Signal", true), ("#", "Colors", true), ("theme_colors", "Custom colors", true)],
 ];
 
+/// Whether a mod's page opens with its on/off row; the menu key can't be turned off.
+fn has_switch(id: &str) -> bool {
+    id != "ring_menu"
+}
+
 /// A mod's settings: key, label, min, max, default. 0..1 is a switch, key "color" is swatches.
 fn settings_of(id: &str) -> &'static [(&'static str, &'static str, i32, i32, i32)] {
     match id {
@@ -235,25 +240,29 @@ pub fn value(id: &str, key: &str) -> i32 {
 fn set_value(id: &str, key: &str, value: i32) {
     with(|s| {
         s.values.entry(id.to_owned()).or_default().insert(key.to_owned(), value);
-        s.saved.push((format!("set_{id}_{key}"), value.to_string()));
+        s.saved.push((set_file(id, key), value.to_string()));
     });
 }
 
-pub fn loaded() -> bool {
-    with(|s| s.loaded)
+/// The saved file for a mod's switch.
+pub fn on_file(id: &str) -> String {
+    format!("on_{id}")
+}
+
+/// The saved file for one of a mod's settings.
+pub fn set_file(id: &str, key: &str) -> String {
+    format!("set_{id}_{key}")
 }
 
 /// Kyro's saved settings: one file per key, as the game's `native_setting` keeps them.
 pub fn data_dir() -> Option<std::path::PathBuf> {
-    std::env::current_dir().ok().map(|d| d.join("horizon-mods").join(".horizon-mod-data").join("kyro"))
+    std::env::current_dir().ok().map(|d| d.join("horizon-mods").join(".horizon-mod-data").join(horizon_core::kyro_shared::ID))
 }
 
-/// Loads the saved settings from disk, for hooks that can run before the first frame does.
+/// Loads the saved settings from disk once, whichever hook asks first.
 pub fn ensure_loaded() {
-    if !loaded() {
-        let dir = data_dir();
-        load(|key| std::fs::read_to_string(dir.as_ref()?.join(key)).ok().map(|v| v.trim().to_owned()));
-    }
+    let dir = data_dir();
+    load(|key| std::fs::read_to_string(dir.as_ref()?.join(key)).ok().map(|v| v.trim().to_owned()));
 }
 
 /// A color's red, green and blue.
@@ -261,16 +270,19 @@ pub fn rgb(color: u32) -> [u32; 3] {
     [(color >> 16) & 255, (color >> 8) & 255, color & 255]
 }
 
-/// Reads the saved switches once.
-pub fn load(get: impl Fn(&str) -> Option<String>) {
+/// Reads the saved switches, the first time only.
+fn load(get: impl Fn(&str) -> Option<String>) {
     with(|s| {
+        if s.loaded {
+            return;
+        }
         for mods in MODS {
             for (id, _, _) in mods {
-                if let Some(value) = get(&format!("on_{id}")) {
+                if let Some(value) = get(&on_file(id)) {
                     s.on.insert((*id).to_owned(), value == "true");
                 }
                 for (key, _, _, _, _) in settings_of(id) {
-                    if let Some(value) = get(&format!("set_{id}_{key}")).and_then(|v| v.parse().ok()) {
+                    if let Some(value) = get(&set_file(&id, &key)).and_then(|v| v.parse().ok()) {
                         s.values.entry((*id).to_owned()).or_default().insert((*key).to_owned(), value);
                     }
                 }
@@ -280,12 +292,12 @@ pub fn load(get: impl Fn(&str) -> Option<String>) {
             ELEMENTS.iter().flat_map(|e| SAVED_KEYS.map(|k| ("hud".to_owned(), format!("{}_{k}", e.0)))),
         );
         for (id, key) in extra {
-            if let Some(value) = get(&format!("set_{id}_{key}")).and_then(|v| v.parse().ok()) {
+            if let Some(value) = get(&set_file(&id, &key)).and_then(|v| v.parse().ok()) {
                 s.values.entry(id).or_default().insert(key, value);
             }
         }
         for (id, key) in TEXT_ROWS {
-            if let (Some(v), Ok(mut texts)) = (get(&format!("set_{id}_{key}")), TEXTS.lock()) {
+            if let (Some(v), Ok(mut texts)) = (get(&set_file(&id, &key)), TEXTS.lock()) {
                 texts.push((format!("{id}.{key}"), v.to_string()));
             }
         }
@@ -415,7 +427,7 @@ fn settings_rect(width: f32, height: f32, id: &str) -> [f32; 4] {
     if let Some(index) = ed(|e| e.popup).filter(|i| ELEMENTS[*i].0 == id) {
         return popup_rect(index, (width, height));
     }
-    let rows = settings_of(id).len() + usize::from(id != "ring_menu");
+    let rows = settings_of(id).len() + usize::from(has_switch(id));
     let preview = if id.starts_with("cape_") { 148.0 } else { 0.0 };
     let h = (rows + app_rows(id)) as f32 * ROW + HEADER + 8.0 + preview;
     let [x, y, w, room] = sheet_area((width, height));
@@ -565,7 +577,6 @@ static EDITOR: LazyLock<Mutex<Editor>> = LazyLock::new(|| Mutex::new(Editor { sn
 static SIZES: LazyLock<Mutex<HashMap<&'static str, [f32; 4]>>> = LazyLock::new(Default::default);
 
 static SCREEN: Mutex<(f32, f32)> = Mutex::new((0.0, 0.0));
-static SHIFT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The GUI's size this frame: moved elements hang off its edges.
 pub fn set_screen(w: f32, h: f32) {
@@ -577,10 +588,6 @@ pub fn set_screen(w: f32, h: f32) {
 
 fn screen() -> (f32, f32) {
     SCREEN.lock().map_or((0.0, 0.0), |s| *s)
-}
-
-pub fn set_shift(held: bool) {
-    SHIFT.store(held, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn ed<T>(f: impl FnOnce(&mut Editor) -> T) -> T {
@@ -1020,7 +1027,7 @@ fn click_hud_editor(cursor: (f32, f32), size: (f32, f32), right: bool) {
             e.popup = Some(index);
         }),
         // Shift adds to the pick, or takes back out.
-        Some(index) if SHIFT.load(std::sync::atomic::Ordering::Relaxed) => ed(|e| {
+        Some(index) if HELD.load(std::sync::atomic::Ordering::Relaxed) & SHIFT_BIT != 0 => ed(|e| {
             if e.group.is_empty() {
                 e.group.extend(e.selected);
             }
@@ -1282,7 +1289,7 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
     frame(batch, atlas, x, y, w, h);
     batch.fill(atlas, x, y, w, HEADER - 4.0, sel());
     text(batch, atlas, name, x + 9.0, y + 6.0, seltxt(), false);
-    if id != "ring_menu" {
+    if has_switch(id) {
         let state = if on(id) { "ON" } else { "OFF" };
         text(batch, atlas, state, x + w - 9.0 - HudBatch::text_width(atlas, state), y + 6.0, seltxt(), false);
     }
@@ -1292,7 +1299,7 @@ fn draw_panel(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32), (id, n
     let right = x + w - 12.0;
     let white = ink();
     let mut ry = y + HEADER + 5.0;
-    if id == "ring_menu" {
+    if !has_switch(id) {
         ry -= ROW; // A key, not a module: nothing to switch.
     } else {
         text(batch, atlas, "Enabled", x + 11.0, ry + 2.0, white, false);
@@ -1435,6 +1442,12 @@ fn media_apps() -> Vec<String> {
 }
 
 /// Rows the Lyrics sheet adds for its app switches: a title, then one each, or a hint.
+/// The page's first music app row: after the switch, the settings and the "Music apps" title,
+/// in the order the panel draws them.
+fn first_app_row(id: &str) -> usize {
+    1 + settings_of(id).len() + 1
+}
+
 fn app_rows(id: &str) -> usize {
     if id == "lyrics" { 1 + media_apps().len().max(1) } else { 0 }
 }
@@ -1481,14 +1494,14 @@ fn click_panel(cursor: (f32, f32), size: (f32, f32), id: &'static str) {
     if row < 0.0 || cursor.0 < x || cursor.0 >= x + w {
         return;
     }
-    let row = if id == "ring_menu" { row + 1.0 } else { row };
+    let row = if has_switch(id) { row } else { row + 1.0 };
     let right = x + w - 12.0;
     if row == 0.0 {
         toggle(id);
         return;
     }
-    if id == "lyrics" && row as usize >= settings_of(id).len() + 2 {
-        if let Some(app) = media_apps().get(row as usize - settings_of(id).len() - 2) {
+    if id == "lyrics" && row as usize >= first_app_row(id) {
+        if let Some(app) = media_apps().get(row as usize - first_app_row(id)) {
             toggle_app(app);
         }
         return;
@@ -1569,9 +1582,8 @@ fn set_text(id: &str, key: &str, value: String) {
         texts.retain(|e| e.0 != name);
         texts.push((name, value.clone()));
     }
-    with(|s| s.saved.push((format!("set_{id}_{key}"), value)));
+    with(|s| s.saved.push((set_file(id, key), value)));
 }
-static MENU_KEY: Mutex<String> = Mutex::new(String::new());
 static CLOSE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// A key pressed on the menu: Game hooks never see these, so the menu's own key handler calls this.
@@ -1665,15 +1677,11 @@ pub fn take_close() -> bool {
 /// Whether this key press is the menu key, modifiers included.
 fn is_menu_key(name: Option<&str>) -> bool {
     let held = HELD.load(std::sync::atomic::Ordering::Relaxed);
-    name.is_some_and(|n| MENU_KEY.lock().is_ok_and(|m| *m == n)) && name.is_some_and(|n| bind_ok("menu", n, held))
+    name.is_some_and(|n| KEY_NAMES.lock().is_ok_and(|k| k.iter().any(|k| k.0 == "menu" && k.2 == n)) && bind_ok("menu", n, held))
 }
 
-pub fn set_menu_key(key: &str) {
-    if let Ok(mut own) = MENU_KEY.lock() && *own != key {
-        key.clone_into(&mut own);
-    }
-}
-static KEY_NAMES: Mutex<Vec<(&'static str, String)>> = Mutex::new(Vec::new());
+/// Each mod key's row text and the key it is on.
+static KEY_NAMES: Mutex<Vec<(&'static str, String, String)>> = Mutex::new(Vec::new());
 
 /// The mod key waiting for its next press, cleared by reading it.
 fn take_listening() -> Option<&'static str> {
@@ -1758,6 +1766,11 @@ fn bind_modifiers(name: &str, key: &str) -> i32 {
 
 static HELD: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 
+/// Bits of a bind's modifiers; Ctrl with Alt is AltGr.
+pub const SHIFT_BIT: i32 = 1;
+pub const CTRL_BIT: i32 = 2;
+pub const ALT_BIT: i32 = 4;
+
 /// The modifiers down this frame, for the menu's own key handling.
 pub fn set_held(modifiers: i32) {
     HELD.store(modifiers, std::sync::atomic::Ordering::Relaxed);
@@ -1792,17 +1805,16 @@ pub fn set_key_name(name: &'static str, key: &str) {
     if let Ok(mut names) = KEY_NAMES.lock() {
         names.retain(|k| k.0 != name);
         let base = key.trim_start_matches("key.keyboard.").trim_start_matches("key.mouse.").replace('.', " ");
-        let prefix = match bind_modifiers(name, key) {
-            1 => "Shift + ",
-            2 => "Ctrl + ",
-            3 => "Ctrl + Shift + ",
-            4 => "Alt + ",
-            5 => "Alt + Shift + ",
-            6 => "AltGr + ",
-            7 => "AltGr + Shift + ",
-            _ => "",
+        let mods = bind_modifiers(name, key);
+        let held = |bit: i32| mods & bit != 0;
+        let first = match (held(CTRL_BIT), held(ALT_BIT)) {
+            (true, true) => "AltGr + ",
+            (true, false) => "Ctrl + ",
+            (false, true) => "Alt + ",
+            (false, false) => "",
         };
-        names.push((name, if base == "unknown" { "None".to_owned() } else { format!("{prefix}{base}") }));
+        let prefix = format!("{first}{}", if held(SHIFT_BIT) { "Shift + " } else { "" });
+        names.push((name, if base == "unknown" { "None".to_owned() } else { format!("{prefix}{base}") }, key.to_owned()));
     }
 }
 
@@ -1862,7 +1874,7 @@ fn toggle(id: &str) {
         with(|s| {
             for (other, _, _) in THEMES {
                 s.on.insert(other.to_owned(), other == id);
-                s.saved.push((format!("on_{other}"), (other == id).to_string()));
+                s.saved.push((on_file(other), (other == id).to_string()));
             }
         });
         return;
@@ -1874,11 +1886,11 @@ fn toggle(id: &str) {
             let others: Vec<String> = s.on.iter().filter(|(k, v)| **v && k.starts_with("cape_")).map(|(k, _)| k.clone()).collect();
             for other in others {
                 s.on.insert(other.clone(), false);
-                s.saved.push((format!("on_{other}"), "false".to_owned()));
+                s.saved.push((on_file(&other), "false".to_owned()));
             }
         }
         s.on.insert(id.to_owned(), enabled);
-        s.saved.push((format!("on_{id}"), enabled.to_string()));
+        s.saved.push((on_file(id), enabled.to_string()));
     });
 }
 
@@ -1934,7 +1946,7 @@ fn ca(slot: usize, alpha: u8) -> u32 {
 }
 
 /// An RGB color as a vertex color.
-pub fn vertex_color(c: u32, alpha: u8) -> u32 {
+fn vertex_color(c: u32, alpha: u8) -> u32 {
     rgba((c >> 16) as u8, (c >> 8) as u8, c as u8, alpha)
 }
 
@@ -2331,7 +2343,7 @@ fn card_count(index: usize) -> String {
     if index == 5 {
         return THEMES[look()].1.to_owned();
     }
-    let rows = MODS[index].iter().filter(|m| m.0 != "#" && !m.0.ends_with("_editor") && m.0 != "ring_menu");
+    let rows = MODS[index].iter().filter(|m| m.0 != "#" && !m.0.ends_with("_editor") && has_switch(m.0));
     let (all, active) = rows.fold((0, 0), |(a, b), m| (a + 1, b + usize::from(on(m.0))));
     format!("{active} / {all}")
 }
@@ -2609,7 +2621,7 @@ fn draw_page(batch: &mut HudBatch, atlas: &HudAtlas, cursor: (f32, f32)) {
         }
         batch.fill(atlas, lx + shift, ry, lw - 6.0, ROW_H - 2.0, if picked { sel() } else if hovered == Some(i) { ca(1, 255) } else { panel() });
         let enabled = on(id);
-        let plain = id.ends_with("_editor") || *id == "ring_menu";
+        let plain = id.ends_with("_editor") || !has_switch(id);
         let mark = if picked { seltxt() } else if enabled && !plain { ink() } else { line() };
         batch.fill(atlas, lx + shift + 5.0, ry + 4.0, 5.0, 5.0, mark);
         text(batch, atlas, name, lx + shift + 15.0, ry + 3.0, if picked { seltxt() } else { ink() }, false);
@@ -2665,7 +2677,7 @@ fn click_page(cursor: (f32, f32), size: (f32, f32), right_click: bool) {
                 s.page = Some((id, name));
                 s.opened = Some(Instant::now());
             });
-        } else if id != "ring_menu" && !right_click {
+        } else if has_switch(id) && !right_click {
             toggle(id);
         }
         return;

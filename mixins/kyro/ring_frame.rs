@@ -91,10 +91,7 @@ fn post(input: PostInput) -> vec4<f32> {
 "#;
     use crate::game::port_kyro as p;
     use horizon_client::options_ui::kyro_ring as m;
-    if !m::loaded() {
-        let game = &*game;
-        m::load(|k| game.native_setting(p::ID, k));
-    }
+    m::ensure_loaded();
     game.settings.extras.own_name_tag = m::on("own_nametag");
     horizon_core::kyro_shared::SHINY_POTIONS.store(m::on("shiny_potions"), std::sync::atomic::Ordering::Relaxed);
     horizon_client::options_ui::kyro_world::set_own_name(game.own_profile_name());
@@ -110,7 +107,6 @@ fn post(input: PostInput) -> vec4<f32> {
     }
     m::set_held(crate::game::kyro_feat::held_modifiers(game));
     if game.screen == crate::game::Screen::Options {
-        m::set_menu_key(&crate::game::kyro_feat::bound_key(game, "menu"));
         for [name, _, _] in m::KEYS {
             m::set_key_name(name, &crate::game::kyro_feat::bound_key(game, name));
         }
@@ -123,7 +119,7 @@ fn post(input: PostInput) -> vec4<f32> {
     // Your shield: the server's cooldown, the local one, or the disable event, whichever is known.
     let shield = [game.offhand.as_ref(), game.held()].into_iter().flatten().find(|s| s.item.ends_with(":shield")).map(|s| s.item.to_string());
     let wait = shield.map_or(0.0_f32, |item| game.cooldowns.percent(&item, 0.0)).max((game.shield_cooldown as f32 / 100.0).min(1.0)).max(crate::game::kyro_feat::shield_wait(crate::game::kyro_feat::YOU));
-    horizon_client::options_ui::kyro_world::set_shield_tint(horizon_client::options_ui::kyro_world::shield_color(wait));
+    horizon_client::options_ui::kyro_world::set_own_shield_color(horizon_client::options_ui::kyro_world::shield_color(wait));
     let held_shield = |s: Option<&crate::game::ItemStack>| s.is_some_and(|s| s.item.ends_with(":shield"));
     let (main, off) = (held_shield(game.held()), held_shield(game.offhand.as_ref()));
     if game.settings.main_hand_left {
@@ -140,7 +136,6 @@ fn post(input: PostInput) -> vec4<f32> {
         crate::game::kyro_feat::session_tick(&format!("{:?}", game.native_player().map(|p| p.dimension)));
     }
     horizon_client::options_ui::kyro_world::set_player_spots(game.mobs.iter().filter(|e| &*e.kind.id == "minecraft:player").map(|e| [e.position.x, e.position.y, e.position.z]).collect());
-    m::set_shift(game.modifiers.shift_key());
     horizon_client::options_ui::kyro_world::set_f3(game.keys.contains(&winit::keyboard::KeyCode::F3));
     // Keep chat: the last lines saved for next launch, and read back, greyed and faded, once a world is up.
     if m::on("better_chat") && m::value("better_chat", "keep") == 1 && game.player.is_some() {
@@ -161,8 +156,10 @@ fn post(input: PostInput) -> vec4<f32> {
             LOG.set((true, game.ui.chat.received, None));
         } else if game.ui.chat.received != seen && at.is_none_or(|t| t.elapsed().as_secs() >= 5) {
             let lines: Vec<String> = game.ui.chat.recent_lines(100).iter().map(|l| l.trim().replace('\n', " ")).collect();
-            if let Some(file) = file() {
-                let _ = std::fs::write(file, lines.join("\n"));
+            if let Some(file) = file()
+                && let Err(error) = std::fs::create_dir_all(file.parent().unwrap_or(&file)).and_then(|()| std::fs::write(&file, lines.join("\n")))
+            {
+                log::warn!("kyro chat log not written: {error}");
             }
             LOG.set((true, game.ui.chat.received, Some(std::time::Instant::now())));
         }

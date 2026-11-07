@@ -67,11 +67,12 @@ pub fn look_distance() -> f32 {
 static SHIELD_TINT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 /// The color your shield draws in now; 0 for none.
-pub fn set_shield_tint(rgb: u32) {
+pub fn set_own_shield_color(rgb: u32) {
     SHIELD_TINT.store(rgb, std::sync::atomic::Ordering::Relaxed);
 }
 
-pub fn shield_tint() -> u32 {
+/// The color shields take now, while a holder's items draw; 0 for none.
+pub fn held_shield_tint() -> u32 {
     TINT_HELD.get().unwrap_or(0)
 }
 

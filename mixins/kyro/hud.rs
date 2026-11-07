@@ -60,7 +60,6 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
     }
     // The HUD items, bare on the game: white labels, mint values, keys lit only while held.
     {
-        use horizon_client::extras::Corner;
         const WHITE: u32 = 0xffffff;
         const MINT: u32 = 0x9ff0c8;
         const HELD: u32 = 0xa0ffd84a;
@@ -605,7 +604,9 @@ fn kyro_hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::H
             for (index, (_, label, value)) in block.iter().enumerate() {
                 let row = y + index as f32 * 12.0;
                 // Mobs spawn at block light 0.
-                let ink = if id == "light" && value == "0" {
+                let ink = if chosen >= 0 {
+                    value_ink
+                } else if id == "light" && value == "0" {
                     0xff5555
                 } else if let Some(tps) = value.parse::<f32>().ok().filter(|_| id == "tps") {
                     if tps >= 19.0 { 0x55ff55 } else if tps >= 15.0 { 0xffaa00 } else { 0xff5555 }

@@ -23,7 +23,9 @@ pub fn bound_key(game: &crate::game::Game<'_>, name: &str) -> String {
 
 /// Shift, Ctrl and Alt held now, as the ring's bind masks keep them.
 pub fn held_modifiers(game: &crate::game::Game<'_>) -> i32 {
-    i32::from(game.modifiers.shift_key()) | i32::from(game.modifiers.control_key()) << 1 | i32::from(game.modifiers.alt_key()) << 2
+    use horizon_client::options_ui::kyro_ring as ring;
+    let bit = |held: bool, bit: i32| if held { bit } else { 0 };
+    bit(game.modifiers.shift_key(), ring::SHIFT_BIT) | bit(game.modifiers.control_key(), ring::CTRL_BIT) | bit(game.modifiers.alt_key(), ring::ALT_BIT)
 }
 
 /// Binds one of Kyro's keys and saves the options.
@@ -48,13 +50,13 @@ pub fn zoom_key(playing: bool, pressed: bool, start: usize) {
 /// The wheel while zooming changes how far; returns whether it used the scroll.
 pub fn zoom_wheel(steps: f32) -> bool {
     use horizon_client::options_ui::kyro_ring as ring;
-    if LOOK.get().is_some() && steps != 0.0 && horizon_client::options_ui::kyro_ring::value("freelook", "scroll") == 1 {
+    if LOOK.get().is_some() && steps != 0.0 && ring::value("freelook", "scroll") == 1 {
         let share = horizon_client::options_ui::kyro_world::look_distance() * if steps > 0.0 { 0.85 } else { 1.0 / 0.85 };
         horizon_client::options_ui::kyro_world::set_look_distance(share.clamp(0.35, 3.0));
         return true;
     }
     let (held, level) = ZOOM.get();
-    if !held || steps == 0.0 || horizon_client::options_ui::kyro_ring::value("zoom", "scroll") == 0 {
+    if !held || steps == 0.0 || ring::value("zoom", "scroll") == 0 {
         return false;
     }
     let next = level * if steps > 0.0 { ZOOM_STEP } else { 1.0 / ZOOM_STEP };
@@ -596,7 +598,7 @@ struct Media {
 
 static MEDIA: std::sync::LazyLock<std::sync::Mutex<Media>> = std::sync::LazyLock::new(Default::default);
 static MEDIA_STARTED: std::sync::Once = std::sync::Once::new();
-const MEDIA_SCRIPT: &str = r#"param($parent, $mode, $data)
+const MEDIA_SCRIPT: &str = r#"param($parent, $mode, $data, $appsOffFile, $onlineFile)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -631,7 +633,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
             $names = ($all | ForEach-Object { $_.SourceAppUserModelId }) -join "`t"
             if ($names -ne $seen) { $seen = $names; [Console]::Out.WriteLine("S`t$names") }
         }
-        $off = @(((Get-Content (Join-Path $data 'set_lyrics_text_apps_off') -Raw -ErrorAction SilentlyContinue) -split '\|') | Where-Object { $_ })
+        $off = @(((Get-Content $appsOffFile -Raw -ErrorAction SilentlyContinue) -split '\|') | Where-Object { $_ })
         $open = @($all | Where-Object { $off -notcontains $_.SourceAppUserModelId })
         $live = @($open | Where-Object { $_.GetPlaybackInfo().PlaybackStatus -eq 'Playing' })
         if ($live.Count -gt 0) { $open = $live }
@@ -656,7 +658,7 @@ while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
                 # Nothing found (a network blip, say): one more try half a minute later, as Java.
                 $retryAt = $null
                 $fresh = $key -ne $last
-                $online = (Get-Content (Join-Path $data 'set_lyrics_online') -ErrorAction SilentlyContinue) -ne '0'
+                $online = (Get-Content $onlineFile -ErrorAction SilentlyContinue) -ne '0'
                 $last = $key
                 $song, $singer = Tidy-Track $p.Title $p.Artist ($s.SourceAppUserModelId -notlike '*Spotify*')
                 [Console]::Out.WriteLine('C')
@@ -807,13 +809,15 @@ fn media_reader(mode: &str) -> std::io::Result<()> {
     use std::io::BufRead;
     let path = std::env::temp_dir().join(format!("kyro-media-{mode}.ps1"));
     std::fs::write(&path, MEDIA_SCRIPT)?;
-    let data = horizon_client::options_ui::kyro_ring::data_dir().unwrap_or_default();
+    use horizon_client::options_ui::kyro_ring as ring;
+    let data = ring::data_dir().unwrap_or_default();
+    let (apps_off, online) = (data.join(ring::set_file("lyrics", "text_apps_off")), data.join(ring::set_file("lyrics", "online")));
     let quoted = |p: &std::path::Path| p.display().to_string().replace('\'', "''");
     let mut command = std::process::Command::new("powershell.exe");
     command
         .args(["-NoProfile", "-NonInteractive", "-Command"])
         // Run as a script block: execution policy covers script files, so nothing has to bypass it.
-        .arg(format!("& ([scriptblock]::Create([IO.File]::ReadAllText('{}'))) {} {mode} '{}'", quoted(&path), std::process::id(), quoted(&data)))
+        .arg(format!("& ([scriptblock]::Create([IO.File]::ReadAllText('{}'))) {} {mode} '{}' '{}' '{}'", quoted(&path), std::process::id(), quoted(&data), quoted(&apps_off), quoted(&online)))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
     #[cfg(windows)]
@@ -1036,7 +1040,9 @@ pub fn nudge(delta: i64) {
     *map.entry(song).or_insert(0) += delta;
     let text: String = map.iter().map(|(k, v)| format!("{k}\t{v}\n")).collect();
     if let Some(path) = nudge_file() {
-        let _ = std::fs::write(path, text);
+        if let Err(error) = std::fs::create_dir_all(path.parent().unwrap_or(&path)).and_then(|()| std::fs::write(&path, text)) {
+            log::warn!("kyro lyric offsets not written: {error}");
+        }
     }
     n.1 = Some(std::time::Instant::now());
 }
